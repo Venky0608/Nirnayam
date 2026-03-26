@@ -25,7 +25,7 @@ Respond ONLY in this JSON, no preamble, no backticks:
 urgency: low/medium/high/critical. time_split must add to 100.`;
 
 // ─── API call ────────────────────────────────────────────────────────────────
-const GEMINI_API_KEY = "AIzaSyD5SZy4yZ8T4360fDEaBw5Ek-ZbNDdEYt4";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
 
 const callNirnayam = async (situation, profile) => {
   const controller = new AbortController();
