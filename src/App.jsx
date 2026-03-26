@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 // ─── Storage helpers (in-memory, no localStorage) ───────────────────────────
 let _profile = null;
