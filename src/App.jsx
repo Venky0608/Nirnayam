@@ -40,7 +40,7 @@ const callNirnayam = async (situation, profile) => {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: buildSystemPrompt(profile) }] },
           contents: [{ role: "user", parts: [{ text: situation }] }],
-          generationConfig: { maxOutputTokens: 3000, temperature: 0.7 }
+          generationConfig: { maxOutputTokens: 10000, temperature: 0.7 }
         }),
       }
     );
