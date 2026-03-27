@@ -46,6 +46,8 @@ const callNirnayam = async (situation, profile) => {
     );
     clearTimeout(timeout);
     const data = await response.json();
+    console.log("API response:", JSON.stringify(data));
+if (data.error) throw new Error(data.error.message);
     const text = data.candidates[0].content.parts[0].text;
     const clean = text.replace(/```json|```/g, "").trim();
     return JSON.parse(clean);
