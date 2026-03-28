@@ -125,15 +125,20 @@ function LandingPage({ onStart }) {
         </div>
 
         {/* Title */}
-        <h1 style={{
-          fontFamily: "'Syne', sans-serif",
-          fontSize: "clamp(56px, 13vw, 92px)",
-          fontWeight: 800, margin: "0 0 8px",
-          lineHeight: 0.95, letterSpacing: "-0.03em", color: "#fff",
-        }}>
-          Nirnayam
-        </h1>
-
+       <h1 style={{
+  width: "100%",
+  textAlign: "center",
+  fontFamily: "'Syne', sans-serif",
+  fontSize: "clamp(40px, 11vw, 92px)",
+  fontWeight: 800,
+  margin: "0 0 8px",
+  lineHeight: 0.9,
+  letterSpacing: "-0.03em",
+  color: "#fff",
+  overflowWrap: "anywhere",
+}}>
+  Nirnayam
+</h1>
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#555", marginBottom: 36, letterSpacing: "0.1em" }}>
           Your student decision advisor
         </div>
