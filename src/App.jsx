@@ -106,7 +106,7 @@ function LandingPage({ onStart }) {
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(24px)",
         transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)",
-        maxWidth: 600, width: "100%",
+        maxWidth: 520, width: "100%",
       }}>
         {/* Logo */}
         <div style={{
@@ -141,7 +141,7 @@ function LandingPage({ onStart }) {
 }}>
   Nirnayam
 </h1>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#555", marginBottom: 36, letterSpacing: "0.1em" }}>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>
           Your student decision advisor
         </div>
 
