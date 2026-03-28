@@ -135,7 +135,7 @@ function LandingPage({ onStart }) {
   lineHeight: 0.9,
   letterSpacing: "-0.03em",
   color: "#fff",
-  overflowWrap: "anywhere",
+  wordBreak: "keep-all",
 }}>
   Nirnayam
 </h1>
