@@ -127,6 +127,8 @@ function LandingPage({ onStart }) {
         {/* Title */}
        <h1 style={{
   width: "100%",
+  display: "flex",
+  justifyContent: "center",
   textAlign: "center",
   fontFamily: "'Syne', sans-serif",
   fontSize: "clamp(40px, 11vw, 92px)",
