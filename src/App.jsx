@@ -1,3 +1,5 @@
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "./firebase";
 import { signInWithPopup } from "firebase/auth";
 import { auth, provider } from "./firebase";
 import React, { useState, useEffect, useRef } from "react";
@@ -94,12 +96,24 @@ function LandingPage({ onStart }) {
 const handleGoogleLogin = async () => {
   try {
     const result = await signInWithPopup(auth, provider);
-    console.log("User:", result.user);
+    const user = result.user;
+
+    console.log("User:", user);
+
+    //  SAVE USER TO FIREBASE
+    await setDoc(doc(db, "users", user.uid), {
+      name: user.displayName,
+      email: user.email,
+      uid: user.uid,
+      createdAt: new Date(),
+    });
+
+    alert("Login successful");
+
   } catch (error) {
     console.error(error);
   }
 };
-
   return (
     <div style={{
       minHeight: "100vh", display: "flex", flexDirection: "column",
