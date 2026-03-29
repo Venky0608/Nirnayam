@@ -1,37 +1,34 @@
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "./firebase";
-import { signInWithPopup } from "firebase/auth";
-import { auth, provider } from "./firebase";
 import React, { useState, useEffect, useRef } from "react";
-
-// ─── Storage helpers ──────────────────────────────────────────────────────────
-let _profile = null;
+import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, provider, db } from "./firebase";
+ 
+// ─── Storage ──────────────────────────────────────────────────────────────────
 let _history = [];
-
-// ─── System prompt builder ────────────────────────────────────────────────────
+ 
+// ─── System prompt ────────────────────────────────────────────────────────────
 const buildSystemPrompt = (profile) => `You are Nirnayam — a sharp decision advisor for students grades 9-12. Break decision paralysis fast.
-
+ 
 Profile: Grade ${profile.grade}${profile.stream ? ` ${profile.stream}` : ""} | Stress: ${profile.stressLevel}/10 | Time mgmt: ${profile.timeManagement}/10 | Priorities: ${profile.priorities.join(", ")} | Subjects: ${profile.allSubjects?.join(", ") || "?"} | Subject priority: ${profile.subjectPriority?.join(" > ") || "?"} | Learning pace: ${profile.learningStyle?.pace || "?"} | Revision time: ${profile.learningStyle?.revisionTime || "?"} | Distraction: ${profile.learningStyle?.distraction}/10 | Slow at doubts: ${profile.learningStyle?.doubtTime || "?"} | Extra: ${profile.additionalContext || "none"}
-
+ 
 LANGUAGE: Handle spelling mistakes and casual language naturally. tmr=tomorrow, rn=now, stressed/freaking out=high stress, kinda worried=medium, chill=low. Never ask to rephrase.
-
+ 
 CATEGORIES: Pick exactly one.
 - Study: one subject/task now
 - Activity: non-academic (rest, eat, sport, hang out, art)
 - Split: divide time between two options
 - Priority: multiple academic tasks, give order (X first, then Y)
 Key: "study math or physics?" = Priority. "study or rest?" = Activity if exhausted.
-
-RULES: One clear recommendation only. Direct like a smart older sibling. Use subject priority order to break ties. Flag urgency clearly. Be decisive and concise. Use strong, direct language without being harsh and indifferent.
-Avoid vague phrases. Be specific and actionable.
-
+ 
+RULES: One clear recommendation only. Direct like a smart older sibling. Use subject priority order to break ties. Flag urgency clearly. Be decisive and concise. Use strong, direct language without being harsh. Avoid vague phrases. Be specific and actionable.
+ 
 Respond ONLY in this JSON, no preamble, no backticks:
 {"decision":"one clear action","confidence":85,"urgency":"high","time_split":{"option_a":70,"option_b":30},"key_insight":"one thing that tips this","action_plan":["step 1","step 2","step 3"],"warning":"one thing to watch or null"}
 urgency: low/medium/high/critical. time_split must add to 100.`;
-
+ 
 // ─── API ──────────────────────────────────────────────────────────────────────
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
-
+ 
 const callNirnayam = async (situation, profile) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
@@ -61,7 +58,21 @@ const callNirnayam = async (situation, profile) => {
     throw err;
   }
 };
-
+ 
+// ─── Firebase helpers ─────────────────────────────────────────────────────────
+const saveProfileToFirestore = async (uid, profile) => {
+  await setDoc(doc(db, "users", uid), {
+    profile,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+};
+ 
+const loadProfileFromFirestore = async (uid) => {
+  const snap = await getDoc(doc(db, "users", uid));
+  if (snap.exists() && snap.data().profile) return snap.data().profile;
+  return null;
+};
+ 
 // ─── Subject data ─────────────────────────────────────────────────────────────
 const COMPULSORY = {
   "Grade 9": ["Math", "Science", "Social Studies", "English"],
@@ -71,7 +82,7 @@ const COMPULSORY = {
   "Commerce": ["Accountancy", "Business Studies", "Economics", "English"],
   "Humanities": ["History", "Political Science", "Geography", "English"],
 };
-
+ 
 const OPTIONAL = {
   "Grade 9": ["Hindi", "Kannada", "Tamil", "Sanskrit", "French", "Computer Science", "Artificial Intelligence", "Physical Education"],
   "Grade 10": ["Hindi", "Kannada", "Tamil", "Sanskrit", "French", "Computer Science", "Artificial Intelligence", "Physical Education"],
@@ -80,40 +91,23 @@ const OPTIONAL = {
   "Commerce": ["Math", "Computer Science", "Artificial Intelligence", "Entrepreneurship", "Physical Education", "Psychology"],
   "Humanities": ["Economics", "Psychology", "Sociology", "Fine Arts", "Physical Education", "Computer Science", "Artificial Intelligence", "Math"],
 };
-
+ 
 const GRADE_OPTIONS = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 const STREAM_OPTIONS = ["Science (PCM)", "Science (PCB)", "Commerce", "Humanities"];
-
+ 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 const urgencyColor = (u) => ({ low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171" }[u] || "#888");
 const confidenceColor = (c) => c >= 75 ? "#4ade80" : c >= 50 ? "#facc15" : "#f87171";
-
+ 
+const mono = "'DM Mono', monospace";
+const syne = "'Syne', sans-serif";
+ 
 // ─── Landing Page ─────────────────────────────────────────────────────────────
-function LandingPage({ onStart }) {
+function LandingPage({ onGoogleSignIn, onGuestStart, authLoading }) {
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   useEffect(() => { setTimeout(() => setVisible(true), 100); }, []);
-const handleGoogleLogin = async () => {
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-
-    console.log("User:", user);
-
-    //  SAVE USER TO FIREBASE
-    await setDoc(doc(db, "users", user.uid), {
-      name: user.displayName,
-      email: user.email,
-      uid: user.uid,
-      createdAt: new Date(),
-    });
-
-    alert("Login successful");
-
-  } catch (error) {
-    console.error(error);
-  }
-};
+ 
   return (
     <div style={{
       minHeight: "100vh", display: "flex", flexDirection: "column",
@@ -125,7 +119,7 @@ const handleGoogleLogin = async () => {
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`,
         pointerEvents: "none",
       }} />
-
+ 
       <div style={{
         position: "relative", zIndex: 1,
         opacity: visible ? 1 : 0,
@@ -133,192 +127,113 @@ const handleGoogleLogin = async () => {
         transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)",
         maxWidth: 520, width: "100%",
       }}>
-        {/* Logo */}
-        <div style={{
-          width: 60, height: 60, border: "1px solid #444", borderRadius: "50%",
-          display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px",
-        }}>
+        <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
-
-        {/* Multilingual subtitle */}
-        <div style={{
-          fontFamily: "'DM Mono', monospace", fontSize: 12,
-          letterSpacing: "0.2em", color: "#666", marginBottom: 14,
-        }}>
+ 
+        <div style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "#666", marginBottom: 14 }}>
           निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · Decision
         </div>
-
-        {/* Title */}
-       <h1 style={{
-  width: "100%",
-  display: "flex",
-  justifyContent: "center",
-  textAlign: "center",
-  fontFamily: "'Syne', sans-serif",
-  fontSize: "clamp(40px, 11vw, 92px)",
-  fontWeight: 800,
-  margin: "0 0 8px",
-  lineHeight: 0.9,
-  letterSpacing: "-0.03em",
-  color: "#fff",
-  wordBreak: "keep-all",
-}}>
-  Nirnayam
-</h1>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>
+ 
+        <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
+          Nirnayam
+        </h1>
+ 
+        <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>
           Your student decision advisor
         </div>
-
-        {/* Poem */}
-        <div style={{
-          fontFamily: "'DM Mono', monospace",
-          fontSize: "clamp(15px, 2.8vw, 18px)",
-          lineHeight: 2.3, color: "#bbb",
-          margin: "0 0 32px", fontStyle: "italic",
-          padding: "0 8px",
-        }}>
+ 
+        <div style={{ fontFamily: mono, fontSize: "clamp(15px, 2.8vw, 18px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 32px", fontStyle: "italic", padding: "0 8px" }}>
           "Decisions, decisions to make,<br />
           conflicted and lost on the way,<br />
           so Nirnayam's advice you should take,<br />
           so we can be better than yesterday."
         </div>
-
-        {/* Short intro */}
-        <div style={{
-          fontFamily: "'DM Mono', monospace",
-          fontSize: "clamp(13px, 2.2vw, 15px)",
-          color: "#999", marginBottom: 16, lineHeight: 2,
-          padding: "0 4px",
-        }}>
-          Nirnayam is an AI chatbot that helps students make better decisions — whether you're torn between basketball practice and studying, unsure whether to rest or keep grinding, or confused about which subject to tackle first. Just describe your situation, and Nirnayam gives you a clear, personalised answer.
+ 
+        <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
+          Nirnayam is an AI chatbot that helps students make better decisions — whether you're torn between basketball practice and studying, unsure whether to rest or keep grinding, or confused about which subject to tackle first.
         </div>
-
-        {/* Expandable section */}
+ 
         {!expanded ? (
-          <button onClick={() => setExpanded(true)} style={{
-            background: "transparent", border: "none", color: "#666",
-            fontFamily: "'DM Mono', monospace", fontSize: 13, cursor: "pointer",
-            marginBottom: 36, textDecoration: "underline",
-            WebkitTapHighlightColor: "transparent",
-          }}>
+          <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 36, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
             Why I built this →
           </button>
         ) : (
-          <div style={{
-            fontFamily: "'DM Mono', monospace", fontSize: 14,
-            color: "#888", marginBottom: 36, lineHeight: 1.9,
-            textAlign: "left", background: "#0d0d0d",
-            border: "1px solid #1e1e1e", borderRadius: 8, padding: "24px",
-          }}>
-            <p style={{ marginTop: 0, marginBottom: 16 }}>
-              In students, the decision-making part of the brain is still developing. When tough choices come up, it's easy to make decisions you regret — or avoid the decision entirely and doomscroll. As a student myself, I've faced this many times.
-            </p>
-            <p style={{ marginBottom: 16 }}>
-              So I built Nirnayam — an AI chatbot made specifically for students. Through a short onboarding process, it gets to know you well: your subjects, priorities, how stress affects you, and your learning style. All you need to do is be honest and describe your situation fully.
-            </p>
-            <p style={{ marginBottom: 16 }}>
-              Nirnayam will give you a clear recommendation, show you how confident it is, provide a step-by-step action plan, and flag anything to watch out for.
-            </p>
-            <p style={{ marginBottom: 16 }}>
-              In the world of AI, let's use it for good. My dream is to use technology to help people — and this is a start. Check it out, and let me know what you think.
-            </p>
-            <button onClick={() => setExpanded(false)} style={{
-              background: "transparent", border: "none", color: "#555",
-              fontFamily: "'DM Mono', monospace", fontSize: 12, cursor: "pointer",
-              textDecoration: "underline", WebkitTapHighlightColor: "transparent",
-            }}>
-              Show less ↑
-            </button>
+          <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 36, lineHeight: 1.9, textAlign: "left", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "24px" }}>
+            <p style={{ marginTop: 0, marginBottom: 16 }}>In students, the decision-making part of the brain is still developing. When tough choices come up, it's easy to make decisions you regret — or avoid the decision entirely and doomscroll. As a student myself, I've faced this many times.</p>
+            <p style={{ marginBottom: 16 }}>So I built Nirnayam — an AI chatbot made specifically for students. Through a short onboarding process, it gets to know you well: your subjects, priorities, how stress affects you, and your learning style.</p>
+            <p style={{ marginBottom: 16 }}>Nirnayam will give you a clear recommendation, show you how confident it is, provide a step-by-step action plan, and flag anything to watch out for.</p>
+            <p style={{ marginBottom: 16 }}>In the world of AI, let's use it for good. My dream is to use technology to help people — and this is a start.</p>
+            <button onClick={() => setExpanded(false)} style={{ background: "transparent", border: "none", color: "#555", fontFamily: mono, fontSize: 12, cursor: "pointer", textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>Show less ↑</button>
           </div>
         )}
-
-{/* Google Login Button */}
-<button onClick={handleGoogleLogin} style={{
-  background: "#fff",
-  color: "#000",
-  border: "none",
-  borderRadius: 5,
-  padding: "17px 44px",
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 15,
-  fontWeight: 500,
-  cursor: "pointer",
-  letterSpacing: "0.05em",
-  transition: "all 0.2s",
-  display: "block",
-  margin: "0 auto 12px",
-  WebkitTapHighlightColor: "transparent",
-}}
-onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }}
-onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
->
-  Continue with Google
-</button>
-
-{/* Get Started Button */}
-<button onClick={onStart} style={{
-  background: "transparent",
-  color: "#888",
-  border: "1px solid #444",
-  borderRadius: 5,
-  padding: "14px 36px",
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 14,
-  cursor: "pointer",
-  letterSpacing: "0.05em",
-  display: "block",
-  margin: "0 auto",
-}}>
-  Get started →
-</button>
-
-{/* Footer text */}
-<div style={{
-  marginTop: 22,
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 12,
-  color: "#333"
-}}>
-  Takes ~2 minutes · Free · No account needed
-</div>
-          </div>
+ 
+        {/* Google Sign In */}
+        <button onClick={onGoogleSignIn} disabled={authLoading} style={{
+          background: "#fff", color: "#000", border: "none", borderRadius: 5,
+          padding: "17px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500,
+          cursor: authLoading ? "not-allowed" : "pointer", letterSpacing: "0.05em",
+          transition: "all 0.2s", display: "block", margin: "0 auto 12px",
+          WebkitTapHighlightColor: "transparent", opacity: authLoading ? 0.6 : 1,
+        }}
+          onMouseEnter={e => { if (!authLoading) e.currentTarget.style.background = "#e5e5e5"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
+        >
+          {authLoading ? "signing in..." : "Continue with Google"}
+        </button>
+ 
+        {/* Guest */}
+        <button onClick={onGuestStart} style={{
+          background: "transparent", color: "#777", border: "1px solid #333",
+          borderRadius: 5, padding: "13px 36px", fontFamily: mono, fontSize: 13,
+          cursor: "pointer", letterSpacing: "0.05em", display: "block", margin: "0 auto",
+          WebkitTapHighlightColor: "transparent",
+        }}>
+          Continue without account
+        </button>
+ 
+        <div style={{ marginTop: 14, fontFamily: mono, fontSize: 11, color: "#2a2a2a" }}>
+          Sign in to save your profile across devices
+        </div>
+ 
+        <div style={{ marginTop: 8, fontFamily: mono, fontSize: 12, color: "#333" }}>
+          Free · No payment needed
+        </div>
+      </div>
     </div>
   );
 }
-
+ 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
-function OnboardingPage({ onComplete }) {
+function OnboardingPage({ onComplete, initialAnswers }) {
   const [step, setStep] = useState(0);
-  const [stream, setStream] = useState("");
+  const [stream, setStream] = useState(initialAnswers?.stream || "");
   const [dragIdx, setDragIdx] = useState(null);
-  const [touchDragIdx, setTouchDragIdx] = useState(null);
-  const touchStartRef = useRef(null);
-  const [answers, setAnswers] = useState({
+  const [answers, setAnswers] = useState(initialAnswers || {
     grade: "", stressLevel: 5, timeManagement: 6,
     priorities: [], optionalSubjects: [], subjectPriority: [],
     learningStyle: { pace: "", revisionTime: "", distraction: 5, doubtTime: "" },
     additionalContext: ""
   });
-
+ 
   const QUESTIONS = [
     { id: "grade", question: "What grade are you in?", type: "choice", options: GRADE_OPTIONS },
     { id: "stressLevel", question: "How much does stress affect you?", subtitle: "Be honest — this helps calibrate your advice", type: "scale", min: 1, max: 10, labels: ["Stress? What stress?", "Stress hits hard"] },
     { id: "timeManagement", question: "How's your time management?", subtitle: "On a normal school day", type: "scale", min: 1, max: 10, labels: ["I always run out of time", "I manage time well"] },
     { id: "priorities", question: "What matters most to you?", subtitle: "Pick all that apply", type: "multi", options: ["Academics", "Sports", "Music/Arts", "Social life", "Personal projects", "Family"] },
     { id: "optionalSubjects", question: "Which additional subjects do you take?", subtitle: "Your core subjects are already included — pick any extras you study", type: "subjects" },
-    { id: "subjectPriority", question: "Rank your subjects by importance", subtitle: "Drag to reorder — top = most important to you", type: "rank" },
+    { id: "subjectPriority", question: "Rank your subjects by importance", subtitle: "Drag to reorder · Use arrows on mobile — top = most important", type: "rank" },
     { id: "learningStyle", question: "How do you learn?", subtitle: "Helps Nirnayam give smarter time estimates", type: "learning" },
-    { id: "additionalContext", question: "Anything else Nirnayam should know about you?", subtitle: "Optional — upcoming exams, specific goals, etc.", type: "text", optional: true },
+    { id: "additionalContext", question: "Anything else Nirnayam should know?", subtitle: "Optional — upcoming exams, specific goals, etc.", type: "text", optional: true },
   ];
-
+ 
   const q = QUESTIONS[step];
   const streamKey = (answers.grade === "Grade 9" || answers.grade === "Grade 10") ? answers.grade : stream;
   const compulsory = streamKey ? (COMPULSORY[streamKey] || []) : [];
   const optionalList = streamKey ? (OPTIONAL[streamKey] || []) : [];
   const allSubjects = [...compulsory, ...answers.optionalSubjects];
   const progress = (step / QUESTIONS.length) * 100;
-
+ 
   const canProceed = () => {
     if (q.optional) return true;
     if (q.type === "multi") return answers[q.id].length > 0;
@@ -331,16 +246,14 @@ function OnboardingPage({ onComplete }) {
     if (q.type === "learning") return answers.learningStyle.pace !== "" && answers.learningStyle.doubtTime !== "";
     return true;
   };
-
+ 
   const handleOptionalSubject = (sub) => {
     setAnswers(a => {
-      const newOpt = a.optionalSubjects.includes(sub)
-        ? a.optionalSubjects.filter(x => x !== sub)
-        : [...a.optionalSubjects, sub];
+      const newOpt = a.optionalSubjects.includes(sub) ? a.optionalSubjects.filter(x => x !== sub) : [...a.optionalSubjects, sub];
       return { ...a, optionalSubjects: newOpt };
     });
   };
-
+ 
   const next = () => {
     if (q.id === "optionalSubjects") {
       setAnswers(a => ({ ...a, subjectPriority: [...compulsory, ...a.optionalSubjects] }));
@@ -348,10 +261,9 @@ function OnboardingPage({ onComplete }) {
     if (step < QUESTIONS.length - 1) setStep(s => s + 1);
     else onComplete({ ...answers, stream, allSubjects });
   };
-
+ 
   const back = () => { if (step > 0) setStep(s => s - 1); };
-
-  // Desktop drag
+ 
   const handleDragStart = (i) => setDragIdx(i);
   const handleDragOver = (e, i) => {
     e.preventDefault();
@@ -365,8 +277,7 @@ function OnboardingPage({ onComplete }) {
     });
   };
   const handleDragEnd = () => setDragIdx(null);
-
-  // Mobile touch — up/down arrows as fallback
+ 
   const moveItem = (from, to) => {
     if (to < 0 || to >= answers.subjectPriority.length) return;
     setAnswers(a => {
@@ -376,77 +287,55 @@ function OnboardingPage({ onComplete }) {
       return { ...a, subjectPriority: arr };
     });
   };
-
+ 
   const btnStyle = (selected) => ({
     background: selected ? "#fff" : "transparent",
     color: selected ? "#000" : "#ccc",
     border: `1px solid ${selected ? "#fff" : "#2a2a2a"}`,
     borderRadius: 5, padding: "14px 16px",
-    fontFamily: "'DM Mono', monospace", fontSize: 14,
+    fontFamily: mono, fontSize: 14,
     cursor: "pointer", textAlign: "left", transition: "all 0.2s",
     WebkitTapHighlightColor: "transparent", minHeight: 50,
   });
-
+ 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 20px" }}>
       <div style={{ width: "100%", maxWidth: 540 }}>
-        {/* Progress */}
         <div style={{ marginBottom: 36 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <button onClick={back} disabled={step === 0} style={{
-              background: "transparent", border: "none",
-              color: step === 0 ? "#1e1e1e" : "#777",
-              fontFamily: "'DM Mono', monospace", fontSize: 13,
-              cursor: step === 0 ? "default" : "pointer",
-              WebkitTapHighlightColor: "transparent",
-              padding: "4px 0",
-            }}>
+            <button onClick={back} disabled={step === 0} style={{ background: "transparent", border: "none", color: step === 0 ? "#1e1e1e" : "#777", fontFamily: mono, fontSize: 13, cursor: step === 0 ? "default" : "pointer", WebkitTapHighlightColor: "transparent", padding: "4px 0" }}>
               {step > 0 ? "← Back" : ""}
             </button>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#444" }}>
-              {step + 1} / {QUESTIONS.length}
-            </span>
+            <span style={{ fontFamily: mono, fontSize: 12, color: "#444" }}>{step + 1} / {QUESTIONS.length}</span>
           </div>
           <div style={{ background: "#1a1a1a", borderRadius: 3, height: 3 }}>
             <div style={{ height: "100%", background: "#fff", borderRadius: 3, width: `${progress}%`, transition: "width 0.4s ease" }} />
           </div>
         </div>
-
+ 
         <div key={step} style={{ animation: "fadeIn 0.3s ease forwards" }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(22px, 5vw, 30px)", fontWeight: 700, color: "#fff", margin: "0 0 8px", lineHeight: 1.2 }}>
-            {q.question}
-          </h2>
-          {q.subtitle && <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#666", margin: "0 0 24px", lineHeight: 1.6 }}>{q.subtitle}</p>}
+          <h2 style={{ fontFamily: syne, fontSize: "clamp(22px, 5vw, 30px)", fontWeight: 700, color: "#fff", margin: "0 0 8px", lineHeight: 1.2 }}>{q.question}</h2>
+          {q.subtitle && <p style={{ fontFamily: mono, fontSize: 13, color: "#666", margin: "0 0 24px", lineHeight: 1.6 }}>{q.subtitle}</p>}
           {!q.subtitle && <div style={{ marginBottom: 24 }} />}
-
-          {/* Choice */}
+ 
           {q.type === "choice" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {q.options.map(opt => (
-                <button key={opt} onClick={() => setAnswers(a => ({ ...a, [q.id]: opt }))} style={btnStyle(answers[q.id] === opt)}>
-                  {opt}
-                </button>
+                <button key={opt} onClick={() => setAnswers(a => ({ ...a, [q.id]: opt }))} style={btnStyle(answers[q.id] === opt)}>{opt}</button>
               ))}
             </div>
           )}
-
-          {/* Scale */}
+ 
           {q.type === "scale" && (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#666", marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#666", marginBottom: 16 }}>
                 <span>{q.labels[0]}</span><span>{q.labels[1]}</span>
               </div>
-              <input type="range" min={q.min} max={q.max} value={answers[q.id]}
-                onChange={e => setAnswers(a => ({ ...a, [q.id]: Number(e.target.value) }))}
-                style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }}
-              />
-              <div style={{ textAlign: "center", marginTop: 16, fontFamily: "'Syne', sans-serif", fontSize: 48, fontWeight: 800, color: "#fff" }}>
-                {answers[q.id]}
-              </div>
+              <input type="range" min={q.min} max={q.max} value={answers[q.id]} onChange={e => setAnswers(a => ({ ...a, [q.id]: Number(e.target.value) }))} style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }} />
+              <div style={{ textAlign: "center", marginTop: 16, fontFamily: syne, fontSize: 48, fontWeight: 800, color: "#fff" }}>{answers[q.id]}</div>
             </div>
           )}
-
-          {/* Multi */}
+ 
           {q.type === "multi" && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {q.options.map(opt => {
@@ -455,120 +344,75 @@ function OnboardingPage({ onComplete }) {
                   <button key={opt} onClick={() => {
                     const curr = answers[q.id];
                     setAnswers(a => ({ ...a, [q.id]: sel ? curr.filter(x => x !== opt) : [...curr, opt] }));
-                  }} style={{ ...btnStyle(sel), padding: "12px 16px" }}>
-                    {opt}
-                  </button>
+                  }} style={{ ...btnStyle(sel), padding: "12px 16px" }}>{opt}</button>
                 );
               })}
             </div>
           )}
-
-          {/* Subjects */}
+ 
           {q.type === "subjects" && (
             <div>
               {(answers.grade === "Grade 11" || answers.grade === "Grade 12") && (
                 <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
-                    Which stream are you in?
-                  </div>
+                  <div style={{ fontFamily: mono, fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Which stream are you in?</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {STREAM_OPTIONS.map(s => (
-                      <button key={s} onClick={() => { setStream(s); setAnswers(a => ({ ...a, optionalSubjects: [] })); }}
-                        style={{ ...btnStyle(stream === s), padding: "12px 16px" }}>
-                        {s}
-                      </button>
+                      <button key={s} onClick={() => { setStream(s); setAnswers(a => ({ ...a, optionalSubjects: [] })); }} style={{ ...btnStyle(stream === s), padding: "12px 16px" }}>{s}</button>
                     ))}
                   </div>
                 </div>
               )}
-
               {compulsory.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
-                    Core subjects — already included
-                  </div>
+                  <div style={{ fontFamily: mono, fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Core subjects — already included</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {compulsory.map(sub => (
-                      <div key={sub} style={{
-                        background: "#111", border: "1px solid #222", borderRadius: 5,
-                        padding: "10px 14px", fontFamily: "'DM Mono', monospace",
-                        fontSize: 13, color: "#666",
-                      }}>
-                        {sub} ✓
-                      </div>
+                      <div key={sub} style={{ background: "#111", border: "1px solid #222", borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: "#666" }}>{sub} ✓</div>
                     ))}
                   </div>
                 </div>
               )}
-
               {optionalList.length > 0 && (
                 <div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
-                    Additional subjects — pick any you study
-                  </div>
+                  <div style={{ fontFamily: mono, fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Additional subjects — pick any you study</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {optionalList.map(sub => (
-                      <button key={sub} onClick={() => handleOptionalSubject(sub)}
-                        style={{ ...btnStyle(answers.optionalSubjects.includes(sub)), padding: "12px 14px" }}>
-                        {sub}
-                      </button>
+                      <button key={sub} onClick={() => handleOptionalSubject(sub)} style={{ ...btnStyle(answers.optionalSubjects.includes(sub)), padding: "12px 14px" }}>{sub}</button>
                     ))}
                   </div>
                 </div>
               )}
             </div>
           )}
-
-          {/* Rank */}
+ 
           {q.type === "rank" && (
             <div>
               {answers.subjectPriority.length === 0 ? (
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#555" }}>No subjects selected. Go back and select your subjects.</div>
+                <div style={{ fontFamily: mono, fontSize: 13, color: "#555" }}>No subjects selected. Go back and select your subjects.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {answers.subjectPriority.map((sub, i) => (
-                    <div key={sub} draggable
-                      onDragStart={() => handleDragStart(i)}
-                      onDragOver={(e) => handleDragOver(e, i)}
-                      onDragEnd={handleDragEnd}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 12,
-                        padding: "14px 16px",
-                        background: dragIdx === i ? "#1e1e1e" : "#0d0d0d",
-                        border: `1px solid ${dragIdx === i ? "#444" : "#222"}`,
-                        borderRadius: 5, userSelect: "none", WebkitUserSelect: "none",
-                      }}
+                    <div key={sub} draggable onDragStart={() => handleDragStart(i)} onDragOver={(e) => handleDragOver(e, i)} onDragEnd={handleDragEnd}
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: dragIdx === i ? "#1e1e1e" : "#0d0d0d", border: `1px solid ${dragIdx === i ? "#444" : "#222"}`, borderRadius: 5, userSelect: "none", WebkitUserSelect: "none" }}
                     >
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#444", minWidth: 22 }}>{i + 1}</span>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 14, color: "#ccc", flex: 1 }}>{sub}</span>
-                      {/* Mobile arrows */}
+                      <span style={{ fontFamily: mono, fontSize: 12, color: "#444", minWidth: 22 }}>{i + 1}</span>
+                      <span style={{ fontFamily: mono, fontSize: 14, color: "#ccc", flex: 1 }}>{sub}</span>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <button onClick={() => moveItem(i, i - 1)} style={{
-                          background: "transparent", border: "1px solid #222", borderRadius: 3,
-                          color: "#555", cursor: "pointer", fontSize: 12, padding: "2px 8px",
-                          WebkitTapHighlightColor: "transparent",
-                        }}>↑</button>
-                        <button onClick={() => moveItem(i, i + 1)} style={{
-                          background: "transparent", border: "1px solid #222", borderRadius: 3,
-                          color: "#555", cursor: "pointer", fontSize: 12, padding: "2px 8px",
-                          WebkitTapHighlightColor: "transparent",
-                        }}>↓</button>
+                        <button onClick={() => moveItem(i, i - 1)} style={{ background: "transparent", border: "1px solid #222", borderRadius: 3, color: "#555", cursor: "pointer", fontSize: 12, padding: "2px 8px", WebkitTapHighlightColor: "transparent" }}>↑</button>
+                        <button onClick={() => moveItem(i, i + 1)} style={{ background: "transparent", border: "1px solid #222", borderRadius: 3, color: "#555", cursor: "pointer", fontSize: 12, padding: "2px 8px", WebkitTapHighlightColor: "transparent" }}>↓</button>
                       </div>
                     </div>
                   ))}
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#333", marginTop: 6 }}>
-                    Drag to reorder on desktop · Use arrows on mobile
-                  </div>
+                  <div style={{ fontFamily: mono, fontSize: 11, color: "#333", marginTop: 6 }}>Drag to reorder on desktop · Use arrows on mobile</div>
                 </div>
               )}
             </div>
           )}
-
-          {/* Learning style */}
+ 
           {q.type === "learning" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#777", marginBottom: 10 }}>How quickly do you grasp new concepts?</div>
+                <div style={{ fontFamily: mono, fontSize: 13, color: "#777", marginBottom: 10 }}>How quickly do you grasp new concepts?</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {["Quick — I get things fast", "Moderate — I need a few attempts", "Slow — I need time to absorb properly"].map(opt => (
                     <button key={opt} onClick={() => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, pace: opt } }))} style={btnStyle(answers.learningStyle.pace === opt)}>{opt}</button>
@@ -576,7 +420,7 @@ function OnboardingPage({ onComplete }) {
                 </div>
               </div>
               <div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#777", marginBottom: 10 }}>How long does revising one subject typically take you?</div>
+                <div style={{ fontFamily: mono, fontSize: 13, color: "#777", marginBottom: 10 }}>How long does revising one subject typically take you?</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {["Under 30 minutes", "Around 1 hour", "2+ hours"].map(opt => (
                     <button key={opt} onClick={() => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, revisionTime: opt } }))} style={btnStyle(answers.learningStyle.revisionTime === opt)}>{opt}</button>
@@ -584,54 +428,33 @@ function OnboardingPage({ onComplete }) {
                 </div>
               </div>
               <div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#777", marginBottom: 10 }}>How easily do you get distracted while studying?</div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#555", marginBottom: 12 }}>
+                <div style={{ fontFamily: mono, fontSize: 13, color: "#777", marginBottom: 10 }}>How easily do you get distracted while studying?</div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 12 }}>
                   <span>Rarely distracted</span><span>Constantly distracted</span>
                 </div>
-                <input type="range" min={1} max={10} value={answers.learningStyle.distraction}
-                  onChange={e => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, distraction: Number(e.target.value) } }))}
-                  style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }}
-                />
-                <div style={{ textAlign: "center", marginTop: 12, fontFamily: "'Syne', sans-serif", fontSize: 40, fontWeight: 800, color: "#fff" }}>
-                  {answers.learningStyle.distraction}
-                </div>
+                <input type="range" min={1} max={10} value={answers.learningStyle.distraction} onChange={e => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, distraction: Number(e.target.value) } }))} style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }} />
+                <div style={{ textAlign: "center", marginTop: 12, fontFamily: syne, fontSize: 40, fontWeight: 800, color: "#fff" }}>{answers.learningStyle.distraction}</div>
               </div>
               <div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#777", marginBottom: 10 }}>Does clearing doubts usually take you a long time?</div>
+                <div style={{ fontFamily: mono, fontSize: 13, color: "#777", marginBottom: 10 }}>Does clearing doubts usually take you a long time?</div>
                 <div style={{ display: "flex", gap: 10 }}>
                   {["Yes, it takes a while", "No, I resolve them quickly"].map(opt => (
-                    <button key={opt} onClick={() => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, doubtTime: opt } }))}
-                      style={{ ...btnStyle(answers.learningStyle.doubtTime === opt), flex: 1 }}>{opt}</button>
+                    <button key={opt} onClick={() => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, doubtTime: opt } }))} style={{ ...btnStyle(answers.learningStyle.doubtTime === opt), flex: 1 }}>{opt}</button>
                   ))}
                 </div>
               </div>
             </div>
           )}
-
-          {/* Text */}
+ 
           {q.type === "text" && (
-            <textarea value={answers.additionalContext || ""}
-              onChange={e => setAnswers(a => ({ ...a, additionalContext: e.target.value }))}
-              placeholder="e.g. Board exams in 3 months, aiming for 90%+"
-              style={{
-                width: "100%", background: "#0d0d0d", border: "1px solid #2a2a2a",
-                borderRadius: 5, color: "#ddd", fontFamily: "'DM Mono', monospace",
-                fontSize: 14, lineHeight: 1.7, padding: "16px", resize: "none",
-                minHeight: 110, outline: "none", boxSizing: "border-box",
-              }}
+            <textarea value={answers.additionalContext || ""} onChange={e => setAnswers(a => ({ ...a, additionalContext: e.target.value }))} placeholder="e.g. Board exams in 3 months, aiming for 90%+"
+              style={{ width: "100%", background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 5, color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.7, padding: "16px", resize: "none", minHeight: 110, outline: "none", boxSizing: "border-box" }}
             />
           )}
         </div>
-
+ 
         <div style={{ marginTop: 36, display: "flex", justifyContent: "flex-end" }}>
-          <button onClick={next} disabled={!canProceed()} style={{
-            background: canProceed() ? "#fff" : "#1a1a1a",
-            color: canProceed() ? "#000" : "#333",
-            border: "none", borderRadius: 5, padding: "15px 34px",
-            fontFamily: "'DM Mono', monospace", fontSize: 14,
-            cursor: canProceed() ? "pointer" : "not-allowed", transition: "all 0.2s",
-            WebkitTapHighlightColor: "transparent",
-          }}>
+          <button onClick={next} disabled={!canProceed()} style={{ background: canProceed() ? "#fff" : "#1a1a1a", color: canProceed() ? "#000" : "#333", border: "none", borderRadius: 5, padding: "15px 34px", fontFamily: mono, fontSize: 14, cursor: canProceed() ? "pointer" : "not-allowed", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
             {step === QUESTIONS.length - 1 ? "Start using Nirnayam →" : "Next →"}
           </button>
         </div>
@@ -639,23 +462,24 @@ function OnboardingPage({ onComplete }) {
     </div>
   );
 }
-
+ 
 // ─── Main App ─────────────────────────────────────────────────────────────────
-function MainApp({ profile, onBack }) {
+function MainApp({ profile, user, onEditProfile, onSignOut }) {
   const [situation, setSituation] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const textareaRef = useRef(null);
-
+ 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
     }
   }, [situation]);
-
+ 
   const analyse = async () => {
     if (!situation.trim()) return;
     setLoading(true); setError(null); setResult(null);
@@ -669,178 +493,210 @@ function MainApp({ profile, onBack }) {
       setLoading(false);
     }
   };
-
+ 
+  if (showSettings) {
+    return (
+      <SettingsPage
+        profile={profile}
+        user={user}
+        onEditProfile={onEditProfile}
+        onSignOut={onSignOut}
+        onBack={() => setShowSettings(false)}
+      />
+    );
+  }
+ 
   return (
     <div style={{ minHeight: "100vh", padding: "28px 20px", maxWidth: 660, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
         <div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>Nirnayam</div>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#666", marginTop: 4 }}>
+          <div style={{ fontFamily: syne, fontSize: 26, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>Nirnayam</div>
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#666", marginTop: 4 }}>
             {profile.grade}{profile.stream ? ` · ${profile.stream}` : ""} · stress {profile.stressLevel}/10
+            {!user && <span style={{ color: "#333", marginLeft: 8 }}>· guest</span>}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setShowHistory(!showHistory)} style={{
-            background: "transparent", border: "1px solid #222", borderRadius: 4,
-            padding: "9px 14px", fontFamily: "'DM Mono', monospace", fontSize: 13,
-            color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent",
-          }}>
+          <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #222", borderRadius: 4, padding: "9px 14px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
             {showHistory ? "← back" : `history (${_history.length})`}
           </button>
-          <button onClick={onBack} style={{
-            background: "transparent", border: "1px solid #222", borderRadius: 4,
-            padding: "9px 14px", fontFamily: "'DM Mono', monospace", fontSize: 13,
-            color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent",
-          }}>
-            ← profile
+          <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #222", borderRadius: 4, padding: "9px 14px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+            settings
           </button>
         </div>
       </div>
-
+ 
       {showHistory ? (
         <HistoryView onSelect={(h) => { setSituation(h.situation); setResult(h.result); setShowHistory(false); }} />
       ) : (
         <>
           <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, marginBottom: 16, overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid #111", fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#444", letterSpacing: "0.15em", textTransform: "uppercase" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #111", fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.15em", textTransform: "uppercase" }}>
               What are you conflicted about?
             </div>
-            <textarea ref={textareaRef} value={situation}
-              onChange={e => setSituation(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) analyse(); }}
-              placeholder={"Describe your full situation. The more detail you give, the better the advice.\n\ne.g. 'I have a Math exam in 2 days. Revision is mostly done but I'm stressed. Basketball finals are tomorrow and coach wants me at practice today. What should I do?'"}
-              style={{
-                width: "100%", background: "transparent", border: "none",
-                color: "#ddd", fontFamily: "'DM Mono', monospace",
-                fontSize: 14, lineHeight: 1.8, padding: "16px",
-                resize: "none", minHeight: 140, outline: "none", boxSizing: "border-box",
-              }}
+            <textarea ref={textareaRef} value={situation} onChange={e => setSituation(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) analyse(); }}
+              placeholder={"Describe your full situation. The more detail, the better the advice.\n\ne.g. 'I have a Math exam in 2 days. Revision is mostly done but I'm stressed. Basketball finals are tomorrow and coach wants me at practice today. What should I do?'"}
+              style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 140, outline: "none", boxSizing: "border-box" }}
             />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#2a2a2a" }}>
-                {situation.length > 0 ? `${situation.length} chars` : "Ctrl+Enter to analyse"}
-              </span>
-              <button onClick={analyse} disabled={loading || !situation.trim()} style={{
-                background: loading || !situation.trim() ? "#1a1a1a" : "#fff",
-                color: loading || !situation.trim() ? "#333" : "#000",
-                border: "none", borderRadius: 5, padding: "11px 24px",
-                fontFamily: "'DM Mono', monospace", fontSize: 14,
-                cursor: loading || !situation.trim() ? "not-allowed" : "pointer",
-                transition: "all 0.2s", WebkitTapHighlightColor: "transparent",
-              }}>
+              <span style={{ fontFamily: mono, fontSize: 12, color: "#2a2a2a" }}>{situation.length > 0 ? `${situation.length} chars` : "Ctrl+Enter to analyse"}</span>
+              <button onClick={analyse} disabled={loading || !situation.trim()} style={{ background: loading || !situation.trim() ? "#1a1a1a" : "#fff", color: loading || !situation.trim() ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || !situation.trim() ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
                 {loading ? "thinking..." : "decide →"}
               </button>
             </div>
           </div>
-
+ 
           {loading && (
-            <div style={{ padding: "40px 0", textAlign: "center", fontFamily: "'DM Mono', monospace" }}>
+            <div style={{ padding: "40px 0", textAlign: "center", fontFamily: mono }}>
               <div style={{ color: "#555", fontSize: 14, animation: "pulse 1.5s ease-in-out infinite" }}>analysing your situation...</div>
               <div style={{ color: "#2a2a2a", fontSize: 12, marginTop: 8 }}>calibrating to your stress level {profile.stressLevel}/10</div>
             </div>
           )}
-
+ 
           {error && (
-            <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#f87171" }}>
-              {error}
-            </div>
+            <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: mono, fontSize: 13, color: "#f87171" }}>{error}</div>
           )}
-
+ 
           {result && <ResultView result={result} />}
         </>
       )}
     </div>
   );
 }
-
-// ─── Result View ──────────────────────────────────────────────────────────────
-function ResultView({ result }) {
+ 
+// ─── Settings Page ────────────────────────────────────────────────────────────
+function SettingsPage({ profile, user, onEditProfile, onSignOut, onBack }) {
   return (
-    <div style={{ animation: "fadeIn 0.4s ease forwards" }}>
-      <div style={{
-        background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: 8,
-        padding: "22px", marginBottom: 10,
-        borderLeft: `3px solid ${urgencyColor(result.urgency)}`,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase" }}>Decision</div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ background: urgencyColor(result.urgency) + "22", color: urgencyColor(result.urgency), fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "4px 11px", borderRadius: 3, textTransform: "uppercase" }}>
-              {result.urgency}
-            </span>
-            <span style={{ color: confidenceColor(result.confidence), fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800 }}>
-              {result.confidence}%
-            </span>
+    <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40 }}>
+        <button onClick={onBack} style={{ background: "transparent", border: "none", color: "#777", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>← Back</button>
+        <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff" }}>Settings</div>
+      </div>
+ 
+      {/* Account */}
+      <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
+        <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Account</div>
+        {user ? (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              {user.photoURL && <img src={user.photoURL} alt="" style={{ width: 36, height: 36, borderRadius: "50%" }} />}
+              <div>
+                <div style={{ fontFamily: mono, fontSize: 14, color: "#ccc" }}>{user.displayName}</div>
+                <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginTop: 2 }}>{user.email}</div>
+              </div>
+            </div>
+            <button onClick={onSignOut} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 4, padding: "10px 20px", fontFamily: mono, fontSize: 13, color: "#f87171", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+              Sign out
+            </button>
           </div>
-        </div>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(19px, 3.5vw, 25px)", fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>
-          {result.decision}
-        </div>
+        ) : (
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#666" }}>
+            You're using Nirnayam as a guest. Sign in to save your profile across devices.
+          </div>
+        )}
       </div>
-
-      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
-        <div style={{ display: "flex", gap: 3, height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
-          <div style={{ width: `${result.time_split?.option_a || 70}%`, background: "#fff", transition: "width 1s ease" }} />
-          <div style={{ flex: 1, background: "#2a2a2a" }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
-          <span style={{ color: "#ccc" }}>Primary — {result.time_split?.option_a || 70}%</span>
-          <span style={{ color: "#555" }}>Secondary — {result.time_split?.option_b || 30}%</span>
-        </div>
-      </div>
-
-      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Key insight</div>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: "#bbb", lineHeight: 1.7, fontStyle: "italic" }}>
-          "{result.key_insight}"
-        </div>
-      </div>
-
-      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Action plan</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {result.action_plan?.map((step, i) => (
-            <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-              <div style={{
-                width: 28, height: 28, border: "1px solid #2a2a2a", borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#555",
-              }}>{i + 1}</div>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 14, color: "#ccc", lineHeight: 1.7 }}>{step}</span>
+ 
+      {/* Profile summary */}
+      <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
+        <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Your Profile</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            ["Grade", `${profile.grade}${profile.stream ? ` · ${profile.stream}` : ""}`],
+            ["Stress sensitivity", `${profile.stressLevel}/10`],
+            ["Time management", `${profile.timeManagement}/10`],
+            ["Priorities", profile.priorities?.join(", ") || "—"],
+            ["Subjects", profile.allSubjects?.join(", ") || "—"],
+            ["Learning pace", profile.learningStyle?.pace || "—"],
+          ].map(([label, val]) => (
+            <div key={label} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <span style={{ fontFamily: mono, fontSize: 12, color: "#444", minWidth: 140, flexShrink: 0 }}>{label}</span>
+              <span style={{ fontFamily: mono, fontSize: 12, color: "#888", lineHeight: 1.5 }}>{val}</span>
             </div>
           ))}
         </div>
       </div>
-
+ 
+      {/* Edit profile */}
+      <button onClick={onEditProfile} style={{ width: "100%", background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "14px", fontFamily: mono, fontSize: 14, cursor: "pointer", WebkitTapHighlightColor: "transparent", marginBottom: 8 }}>
+        Edit profile
+      </button>
+ 
+      <div style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a", textAlign: "center", marginTop: 8 }}>
+        Editing will re-run the onboarding questionnaire
+      </div>
+    </div>
+  );
+}
+ 
+// ─── Result View ──────────────────────────────────────────────────────────────
+function ResultView({ result }) {
+  return (
+    <div style={{ animation: "fadeIn 0.4s ease forwards" }}>
+      <div style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", marginBottom: 10, borderLeft: `3px solid ${urgencyColor(result.urgency)}` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase" }}>Decision</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ background: urgencyColor(result.urgency) + "22", color: urgencyColor(result.urgency), fontFamily: mono, fontSize: 11, padding: "4px 11px", borderRadius: 3, textTransform: "uppercase" }}>{result.urgency}</span>
+            <span style={{ color: confidenceColor(result.confidence), fontFamily: syne, fontSize: 22, fontWeight: 800 }}>{result.confidence}%</span>
+          </div>
+        </div>
+        <div style={{ fontFamily: syne, fontSize: "clamp(19px, 3.5vw, 25px)", fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{result.decision}</div>
+      </div>
+ 
+      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
+        <div style={{ display: "flex", gap: 3, height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ width: `${result.time_split?.option_a || 70}%`, background: "#fff", transition: "width 1s ease" }} />
+          <div style={{ flex: 1, background: "#2a2a2a" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 13 }}>
+          <span style={{ color: "#ccc" }}>Primary — {result.time_split?.option_a || 70}%</span>
+          <span style={{ color: "#555" }}>Secondary — {result.time_split?.option_b || 30}%</span>
+        </div>
+      </div>
+ 
+      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Key insight</div>
+        <div style={{ fontFamily: mono, fontSize: 15, color: "#bbb", lineHeight: 1.7, fontStyle: "italic" }}>"{result.key_insight}"</div>
+      </div>
+ 
+      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Action plan</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {result.action_plan?.map((step, i) => (
+            <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <div style={{ width: 28, height: 28, border: "1px solid #2a2a2a", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: mono, fontSize: 12, color: "#555" }}>{i + 1}</div>
+              <span style={{ fontFamily: mono, fontSize: 14, color: "#ccc", lineHeight: 1.7 }}>{step}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+ 
       {result.warning && result.warning !== "null" && (
         <div style={{ background: "#0f0a0a", border: "1px solid #2a1a1a", borderRadius: 8, padding: "14px 18px", display: "flex", gap: 12, alignItems: "flex-start" }}>
           <span style={{ color: "#fb923c", fontSize: 17, flexShrink: 0 }}>⚠</span>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 14, color: "#888", lineHeight: 1.7 }}>{result.warning}</span>
+          <span style={{ fontFamily: mono, fontSize: 14, color: "#888", lineHeight: 1.7 }}>{result.warning}</span>
         </div>
       )}
     </div>
   );
 }
-
+ 
 // ─── History View ─────────────────────────────────────────────────────────────
 function HistoryView({ onSelect }) {
   if (_history.length === 0) {
-    return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: "'DM Mono', monospace", fontSize: 14, color: "#2a2a2a" }}>No decisions yet.</div>;
+    return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: mono, fontSize: 14, color: "#2a2a2a" }}>No decisions yet.</div>;
   }
   return (
     <div>
-      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#2a2a2a", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>Past decisions</div>
+      <div style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>Past decisions</div>
       {_history.map((h, i) => (
-        <div key={i} onClick={() => onSelect(h)} style={{
-          background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6,
-          padding: "14px 16px", marginBottom: 8, cursor: "pointer",
-        }}
+        <div key={i} onClick={() => onSelect(h)} style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6, padding: "14px 16px", marginBottom: 8, cursor: "pointer" }}
           onMouseEnter={e => e.currentTarget.style.borderColor = "#333"}
           onMouseLeave={e => e.currentTarget.style.borderColor = "#1a1a1a"}
         >
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#777", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>{h.situation}</div>
-          <div style={{ display: "flex", gap: 16, fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#333" }}>
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#777", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>{h.situation}</div>
+          <div style={{ display: "flex", gap: 16, fontFamily: mono, fontSize: 12, color: "#333" }}>
             <span>{h.result.confidence}% confidence</span>
             <span style={{ color: urgencyColor(h.result.urgency) }}>{h.result.urgency}</span>
             <span>{h.time}</span>
@@ -850,15 +706,77 @@ function HistoryView({ onSelect }) {
     </div>
   );
 }
-
+ 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function Nirnayam() {
-  const [screen, setScreen] = useState("landing");
-
+  const [screen, setScreen] = useState("loading");
+  const [profile, setProfile] = useState(null);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+ 
+  // Listen to auth state
   useEffect(() => {
-    if (_profile) setScreen("app");
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        // Try to load saved profile
+        try {
+          const savedProfile = await loadProfileFromFirestore(firebaseUser.uid);
+          if (savedProfile) {
+            setProfile(savedProfile);
+            setScreen("app");
+          } else {
+            setScreen("onboarding");
+          }
+        } catch {
+          setScreen("onboarding");
+        }
+      } else {
+        setUser(null);
+        setScreen("landing");
+      }
+    });
+    return () => unsub();
   }, []);
-
+ 
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle the rest
+    } catch (e) {
+      console.error(e);
+      setAuthLoading(false);
+    }
+  };
+ 
+  const handleGuestStart = () => {
+    setUser(null);
+    setScreen("onboarding");
+  };
+ 
+  const handleOnboardingComplete = async (newProfile) => {
+    setProfile(newProfile);
+    if (user) {
+      try {
+        await saveProfileToFirestore(user.uid, newProfile);
+      } catch (e) {
+        console.error("Failed to save profile:", e);
+      }
+    }
+    setScreen("app");
+  };
+ 
+  const handleEditProfile = () => {
+    setScreen("onboarding");
+  };
+ 
+  const handleSignOut = async () => {
+    await signOut(auth);
+    setProfile(null);
+    setScreen("landing");
+  };
+ 
   return (
     <div style={{ minHeight: "100vh", background: "#080808", color: "#e5e5e5" }}>
       <style>{`
@@ -875,13 +793,28 @@ export default function Nirnayam() {
         ::-webkit-scrollbar-track { background: #080808; }
         ::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 2px; }
       `}</style>
-
-      {screen === "landing" && <LandingPage onStart={() => setScreen("onboarding")} />}
-      {screen === "onboarding" && (
-        <OnboardingPage onComplete={(profile) => { _profile = profile; setScreen("app"); }} />
+ 
+      {screen === "loading" && (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#333", animation: "pulse 1.5s ease-in-out infinite" }}>loading...</div>
+        </div>
       )}
-      {screen === "app" && _profile && (
-        <MainApp profile={_profile} onBack={() => { _profile = null; setScreen("onboarding"); }} />
+ 
+      {screen === "landing" && (
+        <LandingPage onGoogleSignIn={handleGoogleSignIn} onGuestStart={handleGuestStart} authLoading={authLoading} />
+      )}
+ 
+      {screen === "onboarding" && (
+        <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} />
+      )}
+ 
+      {screen === "app" && profile && (
+        <MainApp
+          profile={profile}
+          user={user}
+          onEditProfile={handleEditProfile}
+          onSignOut={handleSignOut}
+        />
       )}
     </div>
   );
