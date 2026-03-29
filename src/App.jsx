@@ -1,3 +1,5 @@
+import { signInWithPopup } from "firebase/auth";
+import { auth, provider } from "./firebase";
 import React, { useState, useEffect, useRef } from "react";
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
@@ -89,6 +91,14 @@ function LandingPage({ onStart }) {
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   useEffect(() => { setTimeout(() => setVisible(true), 100); }, []);
+const handleGoogleLogin = async () => {
+  try {
+    const result = await signInWithPopup(auth, provider);
+    console.log("User:", result.user);
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   return (
     <div style={{
@@ -220,8 +230,13 @@ function LandingPage({ onStart }) {
           onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }}
           onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
         >
-          Get started →
-        </button>
+<button onClick={handleGoogleLogin}>
+  Continue with Google
+</button>
+
+<button onClick={onStart}>
+  Get started →
+</button>
 
         <div style={{ marginTop: 22, fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#333" }}>
           Takes ~2 minutes · Free · No account needed
