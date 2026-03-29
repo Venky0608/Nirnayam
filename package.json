@@ -2,6 +2,7 @@
   "name": "nirnayam",
   "version": "1.0.0",
   "dependencies": {
+    "firebase": "^12.11.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
