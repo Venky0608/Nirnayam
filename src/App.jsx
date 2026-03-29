@@ -219,29 +219,56 @@ const handleGoogleLogin = async () => {
           </div>
         )}
 
-        <button onClick={onStart} style={{
-          background: "#fff", color: "#000", border: "none",
-          borderRadius: 5, padding: "17px 44px",
-          fontFamily: "'DM Mono', monospace", fontSize: 15,
-          fontWeight: 500, cursor: "pointer", letterSpacing: "0.05em",
-          transition: "all 0.2s", display: "block", margin: "0 auto",
-          WebkitTapHighlightColor: "transparent",
-        }}
-          onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
-        >
-<button onClick={handleGoogleLogin}>
+{/* Google Login Button */}
+<button onClick={handleGoogleLogin} style={{
+  background: "#fff",
+  color: "#000",
+  border: "none",
+  borderRadius: 5,
+  padding: "17px 44px",
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 15,
+  fontWeight: 500,
+  cursor: "pointer",
+  letterSpacing: "0.05em",
+  transition: "all 0.2s",
+  display: "block",
+  margin: "0 auto 12px",
+  WebkitTapHighlightColor: "transparent",
+}}
+onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }}
+onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
+>
   Continue with Google
 </button>
 
-<button onClick={onStart}>
+{/* Get Started Button */}
+<button onClick={onStart} style={{
+  background: "transparent",
+  color: "#888",
+  border: "1px solid #444",
+  borderRadius: 5,
+  padding: "14px 36px",
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 14,
+  cursor: "pointer",
+  letterSpacing: "0.05em",
+  display: "block",
+  margin: "0 auto",
+}}>
   Get started →
 </button>
 
-        <div style={{ marginTop: 22, fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#333" }}>
-          Takes ~2 minutes · Free · No account needed
-        </div>
-      </div>
+{/* Footer text */}
+<div style={{
+  marginTop: 22,
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 12,
+  color: "#333"
+}}>
+  Takes ~2 minutes · Free · No account needed
+</div>
+          </div>
     </div>
   );
 }
