@@ -3,9 +3,6 @@ import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 
-// ─── Storage ──────────────────────────────────────────────────────────────────
-let _history = [];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const mono = "'DM Mono', monospace";
 const syne = "'Syne', sans-serif";
@@ -142,6 +139,7 @@ const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
   return recognition;
 };
 
+// FIX 4: Added onerror handler so setSpeaking(false) always fires
 const speakText = (text, onStart, onEnd) => {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -151,6 +149,7 @@ const speakText = (text, onStart, onEnd) => {
   utterance.pitch = 1;
   if (onStart) utterance.onstart = onStart;
   if (onEnd) utterance.onend = onEnd;
+  utterance.onerror = () => { if (onEnd) onEnd(); };
   window.speechSynthesis.speak(utterance);
 };
 
@@ -197,7 +196,6 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
 
-        {/* Multilingual — centered, all on one responsive line */}
         <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 1.8 }}>
           निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision
         </div>
@@ -269,7 +267,8 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
 }
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
-function OnboardingPage({ onComplete, initialAnswers }) {
+// FIX 5: Accept user prop to show guest warning on last step
+function OnboardingPage({ onComplete, initialAnswers, user }) {
   const [step, setStep] = useState(0);
   const [stream, setStream] = useState(initialAnswers?.stream || "");
   const [dragIdx, setDragIdx] = useState(null);
@@ -305,12 +304,16 @@ function OnboardingPage({ onComplete, initialAnswers }) {
 
   const q = QUESTIONS[step];
   const progress = (step / QUESTIONS.length) * 100;
+  const isLastStep = step === QUESTIONS.length - 1;
 
+  // FIX 2: Tightened canProceed for Grade 9/10 stream_subjects
   const canProceed = () => {
     if (!q) return true;
     if (q.optional) return true;
     if (q.id === "stream_subjects") {
       if ((answers.grade === "Grade 11" || answers.grade === "Grade 12") && !stream) return false;
+      const key = (answers.grade === "Grade 9" || answers.grade === "Grade 10") ? answers.grade : stream;
+      if (!key) return false;
       return true;
     }
     if (q.type === "multi") return (answers[q.id] || []).length > 0;
@@ -517,9 +520,16 @@ function OnboardingPage({ onComplete, initialAnswers }) {
           )}
         </div>
 
-        <div style={{ marginTop: 36, display: "flex", justifyContent: "flex-end" }}>
+        {/* FIX 5: Guest warning on last step */}
+        {isLastStep && !user && (
+          <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginTop: 20, padding: "10px 14px", border: "1px solid #1a1a1a", borderRadius: 5, lineHeight: 1.7 }}>
+            ⚠ You're continuing as a guest. Your profile and history won't be saved if you refresh or close the tab.
+          </div>
+        )}
+
+        <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
           <button onClick={next} disabled={!canProceed()} style={{ background: canProceed() ? "#fff" : "#1a1a1a", color: canProceed() ? "#000" : "#333", border: "none", borderRadius: 5, padding: "15px 34px", fontFamily: mono, fontSize: 14, cursor: canProceed() ? "pointer" : "not-allowed", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
-            {step === QUESTIONS.length - 1 ? "Start using Nirnayam →" : "Next →"}
+            {isLastStep ? "Start using Nirnayam →" : "Next →"}
           </button>
         </div>
       </div>
@@ -567,10 +577,13 @@ function VoiceInputButton({ onTranscript, onError }) {
 function VoiceOutputButton({ result }) {
   const [speaking, setSpeaking] = useState(false);
 
+  // FIX 4: try/catch around speakText call
   const toggle = () => {
     if (speaking) { window.speechSynthesis?.cancel(); setSpeaking(false); return; }
     const text = `Decision: ${result.decision}. Key insight: ${result.key_insight}. Action plan: ${result.action_plan?.join(". ")}.${result.warning && result.warning !== "null" ? ` Warning: ${result.warning}` : ""}`;
-    speakText(text, () => setSpeaking(true), () => setSpeaking(false));
+    try {
+      speakText(text, () => setSpeaking(true), () => setSpeaking(false));
+    } catch { setSpeaking(false); }
   };
 
   if (!window.speechSynthesis) return null;
@@ -652,7 +665,11 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
+  // FIX 1: history is now React state instead of a module-level variable
+  const [history, setHistory] = useState([]);
   const textareaRef = useRef(null);
+  // FIX 3: ref to prevent race-condition double-submits
+  const analysingRef = useRef(false);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -662,15 +679,19 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   }, [situation]);
 
   const analyse = async () => {
-    if (!situation.trim()) return;
+    if (!situation.trim() || analysingRef.current) return;
+    analysingRef.current = true;
     setLoading(true); setError(null); setResult(null);
     try {
       const res = await callNirnayam(situation, profile, personData);
       setResult(res);
-      _history = [{ situation, result: res, time: new Date().toLocaleTimeString() }, ..._history.slice(0, 9)];
+      setHistory(prev => [{ situation, result: res, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
     } catch (e) {
       setError(e.message || "Something went wrong. Check your connection and try again.");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+      analysingRef.current = false;
+    }
   };
 
   if (showSettings) return <SettingsPage profile={profile} user={user} personData={personData} onEditProfile={onEditProfile} onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />;
@@ -684,7 +705,6 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto" }}>
-      {/* Header: title centred, buttons below */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <button onClick={onGoToLanding} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, WebkitTapHighlightColor: "transparent" }}>
@@ -699,13 +719,13 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>settings</button>
           <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
-            {showHistory ? "← back" : `history (${_history.length})`}
+            {showHistory ? "← back" : `history (${history.length})`}
           </button>
         </div>
       </div>
 
       {showHistory ? (
-        <HistoryView onSelect={(h) => { setSituation(h.situation); setResult(h.result); setShowHistory(false); }} />
+        <HistoryView history={history} onSelect={(h) => { setSituation(h.situation); setResult(h.result); setShowHistory(false); }} />
       ) : (
         <>
           <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, marginBottom: 16, overflow: "hidden" }}>
@@ -889,12 +909,13 @@ function ResultView({ result, urgencyInfo, splitA, splitB }) {
 }
 
 // ─── History View ─────────────────────────────────────────────────────────────
-function HistoryView({ onSelect }) {
-  if (_history.length === 0) return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: mono, fontSize: 14, color: "#2a2a2a" }}>No decisions yet this session.</div>;
+// FIX 1: history is now a prop instead of module-level variable
+function HistoryView({ history, onSelect }) {
+  if (history.length === 0) return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: mono, fontSize: 14, color: "#2a2a2a" }}>No decisions yet this session.</div>;
   return (
     <div>
       <div style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>This session</div>
-      {_history.map((h, i) => (
+      {history.map((h, i) => (
         <div key={i} onClick={() => onSelect(h)} style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6, padding: "14px 16px", marginBottom: 8, cursor: "pointer" }}
           onMouseEnter={e => e.currentTarget.style.borderColor = "#333"}
           onMouseLeave={e => e.currentTarget.style.borderColor = "#1a1a1a"}>
@@ -981,7 +1002,8 @@ export default function Nirnayam() {
         </div>
       )}
       {screen === "landing" && <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />}
-      {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} />}
+      {/* FIX 5: pass user prop to OnboardingPage */}
+      {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} user={user} />}
       {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
     </div>
   );
