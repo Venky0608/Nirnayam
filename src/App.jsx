@@ -12,31 +12,39 @@ const syne = "'Syne', sans-serif";
 const urgencyColor = (u) => ({ low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171" }[u] || "#888");
 const confidenceColor = (c) => c >= 75 ? "#4ade80" : c >= 50 ? "#facc15" : "#f87171";
 
-const getUrgencyLabel = (urgency, confidence) => {
+const getUrgencyLabel = (confidence) => {
   if (confidence >= 90) return { label: "critical", color: "#f87171" };
   if (confidence >= 80) return { label: "important", color: "#fb923c" };
   if (confidence >= 70) return { label: "moderate", color: "#facc15" };
   if (confidence >= 65) return { label: "low", color: "#4ade80" };
-  return { label: "not sure", color: "#888" };
+  return { label: "not sure", color: "#555" };
+};
+
+// ─── Click sound ──────────────────────────────────────────────────────────────
+const playClick = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 800;
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.08);
+  } catch {}
 };
 
 // ─── Firebase helpers ─────────────────────────────────────────────────────────
 const saveProfile = async (uid, profile) => {
   await setDoc(doc(db, "users", uid), { profile, updatedAt: new Date().toISOString() }, { merge: true });
 };
-
 const loadProfile = async (uid) => {
   const snap = await getDoc(doc(db, "users", uid));
   return snap.exists() && snap.data().profile ? snap.data().profile : null;
 };
-
 const saveRating = async (uid, ratingData) => {
-  await addDoc(collection(db, "users", uid, "ratings"), {
-    ...ratingData,
-    createdAt: new Date().toISOString(),
-  });
+  await addDoc(collection(db, "users", uid, "ratings"), { ...ratingData, createdAt: new Date().toISOString() });
 };
-
 const loadPersonalisationStats = async (uid) => {
   try {
     const q = query(collection(db, "users", uid, "ratings"), orderBy("createdAt", "desc"), limit(100));
@@ -62,10 +70,9 @@ const buildPersonalisationContext = (personData) => {
   if (!personData || personData.total === 0) return "";
   const lines = Object.entries(personData.stats).map(([cat, data]) => {
     const quality = data.avg >= 4 ? "works well" : data.avg >= 3 ? "moderate results" : "often unsatisfying";
-    return `${cat} advice: ${data.avg}/5 avg (${data.count} ratings) — ${quality} for this student`;
+    return `${cat} advice: ${data.avg}/5 avg (${data.count} ratings) — ${quality}`;
   });
-  const note = personData.total < 5 ? "\nNote: Limited data so far — continue learning." : "";
-  return `\n\nPERSONALISATION (learned from ${personData.total} past ratings — always incorporate this):\n${lines.join("\n")}${note}\nAdjust recommendations based on what has historically worked well for this student. Never ignore this data.`;
+  return `\n\nPERSONALISATION (${personData.total} ratings — always incorporate):\n${lines.join("\n")}\nAdjust recommendations based on what has historically worked well. Never ignore this.`;
 };
 
 // ─── System prompt ────────────────────────────────────────────────────────────
@@ -76,55 +83,39 @@ Profile:
 - Academic goal: ${profile.academicGoal || "not specified"}${profile.competitiveExam ? ` — preparing for ${profile.competitiveExam}` : ""}
 - Stress sensitivity: ${profile.stressLevel}/10
 - Time management: ${profile.timeManagement}/10
-- Best study time: ${profile.studyTime || "not specified"}
-- Sleep: ${profile.sleep || "not specified"}
-- Deadlines: ${profile.deadlineResponse || "not specified"}
-- Decision style: ${profile.decisionStyle || "not specified"}
+- Deadline response: ${profile.deadlineResponse || "not specified"}
 - Priorities: ${profile.priorities?.join(", ") || "not specified"}
 - Subjects: ${profile.allSubjects?.join(", ") || "not specified"}
 - Subject priority: ${profile.subjectPriority?.join(" > ") || "not specified"}
 - Learning pace: ${profile.learningStyle?.pace || "not specified"}
-- Revision time: ${profile.learningStyle?.revisionTime || "not specified"}
-- Distraction: ${profile.learningStyle?.distraction}/10
+- Revision time per subject: ${profile.learningStyle?.revisionTime || "not specified"}
+- Distraction level: ${profile.learningStyle?.distraction}/10
 - Slow at doubts: ${profile.learningStyle?.doubtTime || "not specified"}
 - Extracurriculars: ${profile.extracurriculars || "none"}
 - Extra context: ${profile.additionalContext || "none"}${buildPersonalisationContext(personData)}
 
-LANGUAGE: Handle spelling mistakes and casual language naturally. tmr=tomorrow, rn=now, stressed/freaking out=high stress, kinda worried=medium, chill=low. Never ask to rephrase.
+LANGUAGE: Handle spelling mistakes and casual language naturally. tmr=tomorrow, rn=now, stressed=high stress, kinda worried=medium, chill=low. Never ask to rephrase.
 
-SCOPE RESTRICTION: Only answer questions related to study, work, rest, activity, or decision-making conflicts that a student would face. If someone asks something unrelated — like math problems, general knowledge questions, or anything that is not a personal decision or conflict — respond with: {"decision":"I can only help with personal decisions and conflicts, not general questions. Try asking something like: should I study now or rest?","confidence":0,"urgency":"low","category":"Restricted","time_split":{"option_a":100,"option_b":0},"key_insight":"Nirnayam is a decision advisor, not a general assistant","action_plan":["Describe a real conflict or decision you are facing","Be specific about your situation","Nirnayam will give you a clear recommendation"],"warning":null}
+SCOPE: Only answer personal decision or conflict questions a student would face — study, rest, activity, time management, subject prioritisation. If asked something unrelated (math problems, general trivia, etc.), return: {"decision":"I can only help with personal decisions and conflicts. Try describing a real situation you are facing.","confidence":0,"urgency":"low","category":"Restricted","time_split":{"option_a":100,"option_b":0},"key_insight":"Nirnayam is a decision advisor, not a general assistant","action_plan":["Describe a real conflict or decision you face","Be specific about your situation","Nirnayam will give you a clear recommendation"],"warning":null}
 
-CATEGORIES: Pick exactly one.
-- Study: one subject/task now
-- Activity: non-academic (rest, eat, sport, hang out, art)
-- Split: divide time between two options
-- Priority: multiple academic tasks, give order (X first, then Y)
+CATEGORIES: Study / Activity / Split / Priority
 
-RULES: One clear recommendation only. Direct like a smart older sibling. Use subject priority order to break ties. Flag urgency clearly. Be decisive and concise. Avoid vague phrases. Be specific and actionable. Always factor in best study time, sleep, deadline response style, and decision style from the profile.
+RULES: One clear recommendation. Direct like a smart older sibling. Use subject priority order to break ties. Factor in deadline response and learning pace. Be specific and actionable.
 
 Respond ONLY in this JSON, no preamble, no backticks:
 {"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","time_split":{"option_a":70,"option_b":30},"key_insight":"one thing that tips this","action_plan":["step 1","step 2","step 3"],"warning":"one thing to watch or null"}
-urgency: low/medium/high/critical. category: Study/Activity/Split/Priority/Restricted. time_split values must be whole numbers and must add to exactly 100.`;
+time_split values must be whole numbers and add to exactly 100.`;
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
-
 const callNirnayam = async (situation, profile, personData) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: buildSystemPrompt(profile, personData) }] },
-          contents: [{ role: "user", parts: [{ text: situation }] }],
-          generationConfig: { maxOutputTokens: 5000, temperature: 0.7 }
-        }),
-      }
+      { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
+        body: JSON.stringify({ system_instruction: { parts: [{ text: buildSystemPrompt(profile, personData) }] }, contents: [{ role: "user", parts: [{ text: situation }] }], generationConfig: { maxOutputTokens: 5000, temperature: 0.7 } }) }
     );
     clearTimeout(timeout);
     const data = await response.json();
@@ -132,11 +123,35 @@ const callNirnayam = async (situation, profile, personData) => {
     const text = data.candidates[0].content.parts[0].text;
     const clean = text.replace(/```json|```/g, "").trim();
     return JSON.parse(clean);
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err.name === "AbortError") throw new Error("Request timed out. Try again.");
-    throw err;
-  }
+  } catch (err) { clearTimeout(timeout); if (err.name === "AbortError") throw new Error("Request timed out. Try again."); throw err; }
+};
+
+// ─── Voice helpers ────────────────────────────────────────────────────────────
+const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { onError("Speech recognition is not supported on this browser. Try Chrome."); return null; }
+  const recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = "en-IN";
+  recognition.onstart = onStart;
+  recognition.onresult = (e) => { const transcript = e.results[0][0].transcript; onResult(transcript); };
+  recognition.onerror = (e) => { onError(e.error === "no-speech" ? "No speech detected. Please try again." : "Couldn't understand. Please try again."); };
+  recognition.onend = onEnd;
+  recognition.start();
+  return recognition;
+};
+
+const speakText = (text, onStart, onEnd) => {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-IN";
+  utterance.rate = 0.95;
+  utterance.pitch = 1;
+  if (onStart) utterance.onstart = onStart;
+  if (onEnd) utterance.onend = onEnd;
+  window.speechSynthesis.speak(utterance);
 };
 
 // ─── Subject data ─────────────────────────────────────────────────────────────
@@ -148,33 +163,22 @@ const COMPULSORY = {
   "Commerce": ["Accountancy", "Business Studies", "Economics", "English"],
   "Humanities": ["History", "Political Science", "Geography", "English"],
 };
-
 const OPTIONAL = {
-  "Grade 9": ["Hindi", "Kannada", "Tamil", "Sanskrit", "French", "Computer Science", "Artificial Intelligence", "Physical Education"],
-  "Grade 10": ["Hindi", "Kannada", "Tamil", "Sanskrit", "French", "Computer Science", "Artificial Intelligence", "Physical Education"],
+  "Grade 9": ["Hindi", "Kannada", "Tamil", "Malayalam", "Sanskrit", "French", "Computer Science", "Artificial Intelligence", "Physical Education"],
+  "Grade 10": ["Hindi", "Kannada", "Tamil", "Malayalam", "Sanskrit", "French", "Computer Science", "Artificial Intelligence", "Physical Education"],
   "Science (PCM)": ["Computer Science", "Artificial Intelligence", "Economics", "Physical Education", "Psychology", "Biology"],
   "Science (PCB)": ["Math", "Computer Science", "Artificial Intelligence", "Physical Education", "Psychology", "Biotechnology"],
   "Commerce": ["Math", "Computer Science", "Artificial Intelligence", "Entrepreneurship", "Physical Education", "Psychology"],
   "Humanities": ["Economics", "Psychology", "Sociology", "Fine Arts", "Physical Education", "Computer Science", "Artificial Intelligence", "Math"],
 };
-
 const GRADE_OPTIONS = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 const STREAM_OPTIONS = ["Science (PCM)", "Science (PCB)", "Commerce", "Humanities"];
-
-// ─── Click sound ──────────────────────────────────────────────────────────────
-const playClick = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.08);
-  } catch {}
+const COMPETITIVE_EXAMS = {
+  "Science (PCM)": ["JEE Main", "JEE Advanced", "BITSAT", "VITEEE", "MHT CET", "KCET", "Other"],
+  "Science (PCB)": ["NEET", "AIIMS", "JIPMER", "Other"],
+  "Commerce": ["CA Foundation", "IPMAT", "CUET", "NPAT (NMIMS)", "SET (Symbiosis)", "CLAT", "Other"],
+  "Humanities": ["CUET", "CLAT", "AILET", "NIFT", "NID DAT", "Other"],
+  "Grade 9": [], "Grade 10": [],
 };
 
 // ─── Landing Page ─────────────────────────────────────────────────────────────
@@ -182,7 +186,6 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   useEffect(() => { setTimeout(() => setVisible(true), 100); }, []);
-
   const isReturning = user && profile;
 
   return (
@@ -194,17 +197,17 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
 
-        <div style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "#666", marginBottom: 14 }}>
-          निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · Decision
+        {/* Multilingual — centered, all on one responsive line */}
+        <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 1.8 }}>
+          निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision
         </div>
 
         <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
           Nirnayam
         </h1>
-
         <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
 
-        <div style={{ fontFamily: mono, fontSize: "clamp(15px, 2.8vw, 18px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 32px", fontStyle: "italic", padding: "0 8px" }}>
+        <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
           "Decisions, decisions to make,<br />
           conflicted and lost on the way,<br />
           so Nirnayam's advice you should take,<br />
@@ -216,22 +219,22 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
         </div>
 
         {!expanded ? (
-          <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 36, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
+          <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 32, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
             Why I built this →
           </button>
         ) : (
-          <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 36, lineHeight: 1.9, textAlign: "left", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "24px" }}>
+          <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 32, lineHeight: 1.9, textAlign: "left", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "24px" }}>
             <p style={{ marginTop: 0, marginBottom: 16 }}>In students, the decision-making part of the brain is still developing. When tough choices come up, it's easy to make decisions you regret — or avoid the decision entirely and doomscroll. As a student myself, I've faced this many times.</p>
-            <p style={{ marginBottom: 16 }}>So I built Nirnayam — an AI chatbot made specifically for students. Through a short onboarding process, it gets to know you well: your subjects, priorities, how stress affects you, and your learning style.</p>
-            <p style={{ marginBottom: 16 }}>Nirnayam will give you a clear recommendation, show you how confident it is, provide a step-by-step action plan, and flag anything to watch out for. Rate each decision and Nirnayam learns your patterns over time.</p>
-            <p style={{ marginBottom: 16 }}>In the world of AI, let's use it for good. My dream is to use technology to help people — and this is a start.</p>
+            <p style={{ marginBottom: 16 }}>So I built Nirnayam. Through a short onboarding, it gets to know you well: your subjects, priorities, how stress affects you, and your learning style. All you need to do is describe your situation honestly.</p>
+            <p style={{ marginBottom: 16 }}>Nirnayam gives you a clear recommendation, a confidence score, a step-by-step action plan, and flags anything to watch out for. Rate each decision and it learns your patterns over time.</p>
+            <p style={{ marginBottom: 16 }}>In the world of AI, let's use it for good. This is a start.</p>
             <button onClick={() => setExpanded(false)} style={{ background: "transparent", border: "none", color: "#555", fontFamily: mono, fontSize: 12, cursor: "pointer", textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>Show less ↑</button>
           </div>
         )}
 
         {isReturning ? (
           <div>
-            <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "17px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", letterSpacing: "0.05em", transition: "all 0.2s", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
+            <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
               onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
               Continue as {user.displayName?.split(" ")[0]} →
             </button>
@@ -239,7 +242,7 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
           </div>
         ) : user && !profile ? (
           <div>
-            <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "17px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", letterSpacing: "0.05em", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
+            <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
               onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
               Set up your profile →
             </button>
@@ -247,19 +250,19 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
           </div>
         ) : (
           <div>
-            <button onClick={onGoogleSignIn} disabled={authLoading} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "17px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: authLoading ? "not-allowed" : "pointer", letterSpacing: "0.05em", transition: "all 0.2s", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent", opacity: authLoading ? 0.6 : 1 }}
+            <button onClick={onGoogleSignIn} disabled={authLoading} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: authLoading ? "not-allowed" : "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent", opacity: authLoading ? 0.6 : 1 }}
               onMouseEnter={e => { if (!authLoading) e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
               {authLoading ? "signing in..." : "Continue with Google"}
             </button>
-            <button onClick={onGuestStart} style={{ background: "transparent", color: "#777", border: "1px solid #333", borderRadius: 5, padding: "13px 36px", fontFamily: mono, fontSize: 13, cursor: "pointer", letterSpacing: "0.05em", display: "block", margin: "0 auto 8px", WebkitTapHighlightColor: "transparent" }}>
+            <button onClick={onGuestStart} style={{ background: "transparent", color: "#777", border: "1px solid #333", borderRadius: 5, padding: "12px 36px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 8px", WebkitTapHighlightColor: "transparent" }}>
               Continue without account
             </button>
             <div style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a" }}>Sign in to save your profile and enable personalisation</div>
           </div>
         )}
 
-        <div style={{ marginTop: 24, fontFamily: mono, fontSize: 12, color: "#333" }}>Free · No payment needed</div>
-        <div style={{ marginTop: 32, fontFamily: mono, fontSize: 11, color: "#2a2a2a", letterSpacing: "0.05em" }}>Created by Venkat Sai Varanasi</div>
+        <div style={{ marginTop: 20, fontFamily: mono, fontSize: 12, color: "#333" }}>Free · No payment needed</div>
+        <div style={{ marginTop: 28, fontFamily: mono, fontSize: 11, color: "#2a2a2a", letterSpacing: "0.05em" }}>Created by Venkat Sai Varanasi</div>
       </div>
     </div>
   );
@@ -272,49 +275,46 @@ function OnboardingPage({ onComplete, initialAnswers }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [answers, setAnswers] = useState(initialAnswers || {
     grade: "", academicGoal: "", competitiveExam: "",
-    stressLevel: 5, timeManagement: 6,
-    studyTime: "", sleep: "", deadlineResponse: "", decisionStyle: "",
+    stressLevel: 5, timeManagement: 6, deadlineResponse: "",
     priorities: [], optionalSubjects: [], subjectPriority: [],
     learningStyle: { pace: "", revisionTime: "", distraction: 5, doubtTime: "" },
     extracurriculars: "", additionalContext: ""
   });
 
-  const showCompetitiveExam = answers.academicGoal === "Crack a competitive exam (JEE / NEET / BITSAT / CUET)";
-
-  const QUESTIONS = [
-    { id: "grade", question: "What grade are you in?", type: "choice", options: GRADE_OPTIONS },
-    { id: "academicGoal", question: "What is your main academic goal right now?", subtitle: "This shapes every piece of advice Nirnayam gives you", type: "choice", options: ["Score well in board exams", "Crack a competitive exam (JEE / NEET / BITSAT / CUET)", "Maintain my current grades", "Improve in specific subjects", "No specific goal right now"] },
-    ...(showCompetitiveExam ? [{ id: "competitiveExam", question: "Which competitive exam are you preparing for?", type: "choice", options: ["JEE", "NEET", "BITSAT", "CUET", "Other"] }] : []),
-    { id: "stressLevel", question: "How much does stress affect you?", subtitle: "Be honest — this helps calibrate your advice", type: "scale", min: 1, max: 10, labels: ["Stress? What stress?", "Stress hits hard"] },
-    { id: "timeManagement", question: "How's your time management?", subtitle: "On a normal school day", type: "scale", min: 1, max: 10, labels: ["I always run out of time", "I manage time well"] },
-    { id: "studyTime", question: "When do you study best?", subtitle: "Your peak focus time — Nirnayam will factor this in", type: "choice", options: ["Early morning (before 7am)", "Morning (7am–12pm)", "Afternoon (12pm–4pm)", "Evening (4pm–8pm)", "Night (8pm onwards)", "Varies day to day"] },
-    { id: "sleep", question: "How much sleep do you get on a school night?", subtitle: "Sleep affects decision quality more than most people think", type: "choice", options: ["Less than 5 hours", "5–6 hours", "6–7 hours", "7–8 hours", "8+ hours"] },
-    { id: "deadlineResponse", question: "How do you respond to deadlines?", type: "choice", options: ["They push me to work harder", "They stress me out badly", "A bit of both"] },
-    { id: "decisionStyle", question: "When you're conflicted, what do you usually do?", type: "choice", options: ["I overthink and delay", "I go with my gut quickly", "Depends on the situation"] },
-    { id: "priorities", question: "What matters most to you?", subtitle: "Pick all that apply", type: "multi", options: ["Academics", "Sports", "Music/Arts", "Social life", "Personal projects", "Family"] },
-    { id: "optionalSubjects", question: "Which additional subjects do you take?", subtitle: "Your core subjects are already included — pick any extras", type: "subjects" },
-    { id: "subjectPriority", question: "Rank your subjects by importance", subtitle: "Drag to reorder · Use arrows on mobile — top = most important", type: "rank" },
-    { id: "learningStyle", question: "How do you learn?", subtitle: "Helps Nirnayam give smarter time estimates", type: "learning" },
-    { id: "extracurriculars", question: "Do you have extracurriculars with fixed schedules?", subtitle: "Optional — e.g. cricket practice Mon/Wed 5–7pm, music class Saturday", type: "text", optional: true, placeholder: "e.g. Basketball practice Mon/Wed/Fri 5–7pm" },
-    { id: "additionalContext", question: "Anything else Nirnayam should know about you?", subtitle: "Optional — specific goals, exam dates, anything relevant", type: "text", optional: true, placeholder: "e.g. Board exams in 3 months, aiming for 90%+" },
-  ];
-
-  const q = QUESTIONS[step];
+  const showCompetitiveExam = answers.academicGoal === "Crack a competitive exam";
   const streamKey = (answers.grade === "Grade 9" || answers.grade === "Grade 10") ? answers.grade : stream;
   const compulsory = streamKey ? (COMPULSORY[streamKey] || []) : [];
   const optionalList = streamKey ? (OPTIONAL[streamKey] || []) : [];
   const allSubjects = [...compulsory, ...answers.optionalSubjects];
+  const examList = (streamKey && COMPETITIVE_EXAMS[streamKey]) ? COMPETITIVE_EXAMS[streamKey] : ["JEE", "NEET", "BITSAT", "CUET", "IPMAT", "CLAT", "CA Foundation", "Other"];
+
+  const QUESTIONS = [
+    { id: "grade", question: "What grade are you in?", type: "choice", options: GRADE_OPTIONS },
+    { id: "stream_subjects", question: "What subjects do you study?", subtitle: "Select your stream and any additional subjects you take", type: "subjects" },
+    { id: "subjectPriority", question: "Rank your subjects by importance", subtitle: "Drag to reorder · Use arrows on mobile — top = most important", type: "rank" },
+    { id: "academicGoal", question: "What is your main academic goal right now?", subtitle: "This shapes every piece of advice Nirnayam gives you", type: "choice", options: ["Score well in board exams", "Crack a competitive exam", "Maintain my current grades", "Improve in specific subjects", "No specific goal right now"] },
+    ...(showCompetitiveExam ? [{ id: "competitiveExam", question: "Which competitive exam are you preparing for?", type: "choice", options: examList }] : []),
+    { id: "stressLevel", question: "How much does stress affect you?", subtitle: "Be honest — this helps calibrate your advice", type: "scale", min: 1, max: 10, labels: ["Stress? What stress?", "Stress hits hard"] },
+    { id: "timeManagement", question: "How's your time management?", subtitle: "On a normal school day", type: "scale", min: 1, max: 10, labels: ["I always run out of time", "I manage time well"] },
+    { id: "deadlineResponse", question: "How do you respond to deadlines?", type: "choice", options: ["They push me to work harder", "They stress me out badly", "A bit of both"] },
+    { id: "priorities", question: "What matters most to you?", subtitle: "Pick all that apply", type: "multi", options: ["Academics", "Sports", "Music/Arts", "Social life", "Personal projects", "Family"] },
+    { id: "learningStyle", question: "How do you learn?", subtitle: "Helps Nirnayam give smarter time estimates", type: "learning" },
+    { id: "extracurriculars", question: "Do you have extracurriculars with fixed schedules?", subtitle: "Optional — e.g. cricket practice Mon/Wed 5–7pm", type: "text", optional: true, placeholder: "e.g. Basketball practice Mon/Wed/Fri 5–7pm" },
+    { id: "additionalContext", question: "Anything else Nirnayam should know about you?", subtitle: "Optional — exam dates, specific goals, anything relevant", type: "text", optional: true, placeholder: "e.g. Board exams in 3 months, aiming for 90%+" },
+  ];
+
+  const q = QUESTIONS[step];
   const progress = (step / QUESTIONS.length) * 100;
-  const totalSteps = QUESTIONS.length;
 
   const canProceed = () => {
+    if (!q) return true;
     if (q.optional) return true;
-    if (q.type === "multi") return answers[q.id]?.length > 0;
-    if (q.type === "choice") return answers[q.id] !== "";
-    if (q.type === "subjects") {
+    if (q.id === "stream_subjects") {
       if ((answers.grade === "Grade 11" || answers.grade === "Grade 12") && !stream) return false;
       return true;
     }
+    if (q.type === "multi") return (answers[q.id] || []).length > 0;
+    if (q.type === "choice") return answers[q.id] !== "";
     if (q.type === "rank") return answers.subjectPriority.length > 0;
     if (q.type === "learning") return answers.learningStyle.pace !== "" && answers.learningStyle.doubtTime !== "";
     return true;
@@ -328,7 +328,7 @@ function OnboardingPage({ onComplete, initialAnswers }) {
   };
 
   const next = () => {
-    if (q.id === "optionalSubjects") setAnswers(a => ({ ...a, subjectPriority: [...compulsory, ...a.optionalSubjects] }));
+    if (q.id === "stream_subjects") setAnswers(a => ({ ...a, subjectPriority: [...compulsory, ...a.optionalSubjects] }));
     if (step < QUESTIONS.length - 1) setStep(s => s + 1);
     else onComplete({ ...answers, stream, allSubjects });
   };
@@ -373,20 +373,18 @@ function OnboardingPage({ onComplete, initialAnswers }) {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 20px" }}>
       <div style={{ width: "100%", maxWidth: 560 }}>
-        {/* Honest answers prompt */}
         {step === 0 && (
-          <div style={{ fontFamily: mono, fontSize: 13, color: "#666", textAlign: "center", marginBottom: 28, lineHeight: 1.7, padding: "14px 20px", border: "1px solid #1e1e1e", borderRadius: 6, background: "#0a0a0a" }}>
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#777", textAlign: "center", marginBottom: 28, lineHeight: 1.8, padding: "14px 20px", border: "1px solid #1e1e1e", borderRadius: 6, background: "#0a0a0a" }}>
             Answer these questions honestly, so Nirnayam can get to know you better and make the best decisions for you.
           </div>
         )}
 
-        {/* Progress */}
         <div style={{ marginBottom: 36 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <button onClick={back} disabled={step === 0} style={{ background: "transparent", border: "none", color: step === 0 ? "#1e1e1e" : "#888", fontFamily: mono, fontSize: 14, cursor: step === 0 ? "default" : "pointer", WebkitTapHighlightColor: "transparent", padding: "4px 0" }}>
               {step > 0 ? "← Back" : ""}
             </button>
-            <span style={{ fontFamily: mono, fontSize: 13, color: "#555" }}>{step + 1} / {totalSteps}</span>
+            <span style={{ fontFamily: mono, fontSize: 13, color: "#555" }}>{step + 1} / {QUESTIONS.length}</span>
           </div>
           <div style={{ background: "#1a1a1a", borderRadius: 3, height: 3 }}>
             <div style={{ height: "100%", background: "#fff", borderRadius: 3, width: `${progress}%`, transition: "width 0.4s ease" }} />
@@ -417,13 +415,13 @@ function OnboardingPage({ onComplete, initialAnswers }) {
           {q.type === "multi" && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {q.options.map(opt => {
-                const sel = answers[q.id]?.includes(opt);
+                const sel = (answers[q.id] || []).includes(opt);
                 return <button key={opt} onClick={() => { const c = answers[q.id] || []; setAnswers(a => ({ ...a, [q.id]: sel ? c.filter(x => x !== opt) : [...c, opt] })); }} style={{ ...btnStyle(sel), padding: "13px 16px" }}>{opt}</button>;
               })}
             </div>
           )}
 
-          {q.type === "subjects" && (
+          {q.id === "stream_subjects" && (
             <div>
               {(answers.grade === "Grade 11" || answers.grade === "Grade 12") && (
                 <div style={{ marginBottom: 24 }}>
@@ -460,8 +458,7 @@ function OnboardingPage({ onComplete, initialAnswers }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {answers.subjectPriority.map((sub, i) => (
                     <div key={sub} draggable onDragStart={() => handleDragStart(i)} onDragOver={(e) => handleDragOver(e, i)} onDragEnd={handleDragEnd}
-                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", background: dragIdx === i ? "#1e1e1e" : "#0d0d0d", border: `1px solid ${dragIdx === i ? "#444" : "#2a2a2a"}`, borderRadius: 5, userSelect: "none", WebkitUserSelect: "none" }}
-                    >
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", background: dragIdx === i ? "#1e1e1e" : "#0d0d0d", border: `1px solid ${dragIdx === i ? "#444" : "#2a2a2a"}`, borderRadius: 5, userSelect: "none", WebkitUserSelect: "none" }}>
                       <span style={{ fontFamily: mono, fontSize: 13, color: "#555", minWidth: 24 }}>{i + 1}</span>
                       <span style={{ fontFamily: mono, fontSize: 15, color: "#ddd", flex: 1 }}>{sub}</span>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -497,7 +494,7 @@ function OnboardingPage({ onComplete, initialAnswers }) {
               <div>
                 <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 12 }}>How easily do you get distracted while studying?</div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 13, color: "#666", marginBottom: 14 }}>
-                  <span>Rarely distracted</span><span>Constantly distracted</span>
+                  <span>Rarely</span><span>Constantly</span>
                 </div>
                 <input type="range" min={1} max={10} value={answers.learningStyle.distraction} onChange={e => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, distraction: Number(e.target.value) } }))} style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }} />
                 <div style={{ textAlign: "center", marginTop: 12, fontFamily: syne, fontSize: 44, fontWeight: 800, color: "#fff" }}>{answers.learningStyle.distraction}</div>
@@ -530,6 +527,71 @@ function OnboardingPage({ onComplete, initialAnswers }) {
   );
 }
 
+// ─── Voice Input Button ───────────────────────────────────────────────────────
+function VoiceInputButton({ onTranscript, onError }) {
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const toggle = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    recognitionRef.current = startSpeechRecognition(
+      (transcript) => { onTranscript(transcript); setListening(false); },
+      (err) => { onError(err); setListening(false); },
+      () => setListening(true),
+      () => setListening(false)
+    );
+  };
+
+  return (
+    <button onClick={toggle} title={listening ? "Tap to stop" : "Tap to speak your situation"} style={{
+      background: listening ? "#f87171" : "transparent",
+      border: `1px solid ${listening ? "#f87171" : "#333"}`,
+      borderRadius: 5, padding: "10px 14px",
+      fontFamily: mono, fontSize: 13,
+      color: listening ? "#000" : "#666",
+      cursor: "pointer", transition: "all 0.2s",
+      WebkitTapHighlightColor: "transparent",
+      display: "flex", alignItems: "center", gap: 6,
+      animation: listening ? "pulse 1s ease-in-out infinite" : "none",
+    }}>
+      <span style={{ fontSize: 16 }}>{listening ? "⏹" : "🎙"}</span>
+      <span>{listening ? "listening..." : "speak"}</span>
+    </button>
+  );
+}
+
+// ─── Voice Output Button ──────────────────────────────────────────────────────
+function VoiceOutputButton({ result }) {
+  const [speaking, setSpeaking] = useState(false);
+
+  const toggle = () => {
+    if (speaking) { window.speechSynthesis?.cancel(); setSpeaking(false); return; }
+    const text = `Decision: ${result.decision}. Key insight: ${result.key_insight}. Action plan: ${result.action_plan?.join(". ")}.${result.warning && result.warning !== "null" ? ` Warning: ${result.warning}` : ""}`;
+    speakText(text, () => setSpeaking(true), () => setSpeaking(false));
+  };
+
+  if (!window.speechSynthesis) return null;
+
+  return (
+    <button onClick={toggle} style={{
+      background: speaking ? "#4ade80" : "transparent",
+      border: `1px solid ${speaking ? "#4ade80" : "#2a2a2a"}`,
+      borderRadius: 4, padding: "6px 12px",
+      fontFamily: mono, fontSize: 12,
+      color: speaking ? "#000" : "#555",
+      cursor: "pointer", transition: "all 0.2s",
+      WebkitTapHighlightColor: "transparent",
+      display: "flex", alignItems: "center", gap: 6,
+    }}>
+      <span>{speaking ? "⏹" : "🔊"}</span>
+      <span>{speaking ? "stop" : "listen to advice"}</span>
+    </button>
+  );
+}
+
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
   const [hovered, setHovered] = useState(0);
@@ -544,16 +606,14 @@ function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
       await saveRating(user.uid, { stars, category: result.category || "General", decision: result.decision, situation: situation.slice(0, 200) });
       setSaved(true);
       if (onRated) onRated();
-    } catch (e) { console.error("Failed to save rating:", e); }
+    } catch (e) { console.error(e); }
   };
 
-  if (saved) {
-    return (
-      <div style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginTop: 10, textAlign: "center" }}>
-        <div style={{ fontFamily: mono, fontSize: 13, color: "#4ade80" }}>Rating saved — Nirnayam is learning your patterns ✓</div>
-      </div>
-    );
-  }
+  if (saved) return (
+    <div style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 8, padding: "16px", marginTop: 10, textAlign: "center" }}>
+      <div style={{ fontFamily: mono, fontSize: 13, color: "#4ade80" }}>Rating saved — Nirnayam is learning your patterns ✓</div>
+    </div>
+  );
 
   return (
     <div style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginTop: 10 }}>
@@ -567,7 +627,7 @@ function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
         ))}
       </div>
       <div style={{ fontFamily: mono, fontSize: 12, color: "#444", textAlign: "center" }}>
-        {selected === 0 ? "Rate to help Nirnayam learn your patterns" : selected <= 2 ? "Got it — Nirnayam will adjust future advice" : selected <= 3 ? "Thanks for the feedback" : "Great — Nirnayam will remember this works for you"}
+        {selected === 0 ? "Rate to help Nirnayam learn your patterns" : selected <= 2 ? "Got it — Nirnayam will adjust" : selected <= 3 ? "Thanks for the feedback" : "Great — Nirnayam will remember this works"}
       </div>
       {showSignInPrompt && (
         <div style={{ marginTop: 16, background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "16px", textAlign: "center" }}>
@@ -576,7 +636,7 @@ function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
             <span style={{ color: "#666", fontSize: 12 }}>Your ratings train Nirnayam to learn your patterns over time.</span>
           </div>
           <button onClick={onGoogleSignIn} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 4, padding: "10px 24px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Sign in with Google</button>
-          <button onClick={() => setShowSignInPrompt(false)} style={{ background: "transparent", border: "none", color: "#444", fontFamily: mono, fontSize: 12, cursor: "pointer", marginTop: 10, display: "block", margin: "10px auto 0", WebkitTapHighlightColor: "transparent" }}>Maybe later</button>
+          <button onClick={() => setShowSignInPrompt(false)} style={{ background: "transparent", border: "none", color: "#444", fontFamily: mono, fontSize: 12, cursor: "pointer", display: "block", margin: "10px auto 0", WebkitTapHighlightColor: "transparent" }}>Maybe later</button>
         </div>
       )}
     </div>
@@ -591,6 +651,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const [error, setError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [voiceError, setVoiceError] = useState(null);
   const textareaRef = useRef(null);
 
   useEffect(() => {
@@ -612,33 +673,32 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
     } finally { setLoading(false); }
   };
 
-  if (showSettings) {
-    return <SettingsPage profile={profile} user={user} personData={personData} onEditProfile={onEditProfile} onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />;
-  }
+  if (showSettings) return <SettingsPage profile={profile} user={user} personData={personData} onEditProfile={onEditProfile} onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />;
 
-  const urgencyInfo = result ? getUrgencyLabel(result.urgency, result.confidence) : null;
+  const urgencyInfo = result ? getUrgencyLabel(result.confidence) : null;
+  const rawA = result?.time_split?.option_a ?? 70;
+  const rawB = result?.time_split?.option_b ?? 30;
+  const total = rawA + rawB;
+  const splitA = total > 0 ? Math.round((rawA / total) * 100) : 70;
+  const splitB = 100 - splitA;
 
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto" }}>
-      {/* Mobile-friendly header */}
-      <div style={{ marginBottom: 28 }}>
-        {/* Title centred */}
-        <div style={{ textAlign: "center", marginBottom: 8 }}>
+      {/* Header: title centred, buttons below */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ textAlign: "center", marginBottom: 12 }}>
           <button onClick={onGoToLanding} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, WebkitTapHighlightColor: "transparent" }}>
-            <div style={{ fontFamily: syne, fontSize: 26, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>Nirnayam</div>
+            <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>Nirnayam</div>
           </button>
-          <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginTop: 2 }}>
+          <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginTop: 3 }}>
             {profile.grade}{profile.stream ? ` · ${profile.stream}` : ""}
             {!user && <span style={{ color: "#2a2a2a", marginLeft: 6 }}>· guest</span>}
             {personData && personData.total > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· personalised ({personData.total})</span>}
           </div>
         </div>
-        {/* Buttons below title */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #222", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
-            settings
-          </button>
-          <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #222", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>settings</button>
+          <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
             {showHistory ? "← back" : `history (${_history.length})`}
           </button>
         </div>
@@ -656,19 +716,29 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
               placeholder={"Describe your full situation. The more detail, the better the advice.\n\ne.g. 'I have a Math exam in 2 days. Revision is mostly done but I'm stressed. Basketball finals are tomorrow and coach wants me at practice today. What should I do?'"}
               style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 140, outline: "none", boxSizing: "border-box" }}
             />
-            <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontFamily: mono, fontSize: 12, color: "#2a2a2a" }}>{situation.length > 0 ? `${situation.length} chars` : "Ctrl+Enter to analyse"}</span>
+            <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <VoiceInputButton
+                  onTranscript={(t) => setSituation(prev => prev ? prev + " " + t : t)}
+                  onError={(e) => setVoiceError(e)}
+                />
+                <span style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a" }}>{situation.length > 0 ? `${situation.length} chars` : "or type below"}</span>
+              </div>
               <button onClick={analyse} disabled={loading || !situation.trim()} style={{ background: loading || !situation.trim() ? "#1a1a1a" : "#fff", color: loading || !situation.trim() ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || !situation.trim() ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
                 {loading ? "thinking..." : "decide →"}
               </button>
             </div>
           </div>
 
+          {voiceError && (
+            <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "10px 14px", fontFamily: mono, fontSize: 12, color: "#f87171", marginBottom: 10 }}>{voiceError}</div>
+          )}
+
           {loading && (
             <div style={{ padding: "40px 0", textAlign: "center", fontFamily: mono }}>
               <div style={{ color: "#555", fontSize: 14, animation: "pulse 1.5s ease-in-out infinite" }}>analysing your situation...</div>
               <div style={{ color: "#2a2a2a", fontSize: 12, marginTop: 8 }}>
-                {personData && personData.total > 0 ? `personalised based on ${personData.total} past ratings` : `calibrating to your profile`}
+                {personData && personData.total > 0 ? `personalised based on ${personData.total} past ratings` : "calibrating to your profile"}
               </div>
             </div>
           )}
@@ -677,7 +747,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 
           {result && (
             <>
-              <ResultView result={result} urgencyInfo={urgencyInfo} />
+              <ResultView result={result} urgencyInfo={urgencyInfo} splitA={splitA} splitB={splitB} />
               <StarRating result={result} situation={situation} user={user} onGoogleSignIn={onGoogleSignIn} onRated={onPersonDataRefresh} />
             </>
           )}
@@ -688,7 +758,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 }
 
 // ─── Settings Page ────────────────────────────────────────────────────────────
-function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onBack, onGoToLanding }) {
+function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onBack }) {
   return (
     <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40 }}>
@@ -731,7 +801,7 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
             ))}
           </div>
           <div style={{ fontFamily: mono, fontSize: 11, color: "#333", marginTop: 12 }}>
-            {personData.total < 5 ? `${5 - personData.total} more ratings to fully activate personalisation` : "Personalisation is active and improving with every rating"}
+            {personData.total < 5 ? `${5 - personData.total} more ratings to fully activate personalisation` : "Personalisation active — improving with every rating"}
           </div>
         </div>
       )}
@@ -743,9 +813,9 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
             ["Grade", `${profile.grade}${profile.stream ? ` · ${profile.stream}` : ""}`],
             ["Goal", profile.academicGoal || "—"],
             ["Stress", `${profile.stressLevel}/10`],
-            ["Sleep", profile.sleep || "—"],
-            ["Best study time", profile.studyTime || "—"],
+            ["Deadlines", profile.deadlineResponse || "—"],
             ["Subjects", profile.allSubjects?.join(", ") || "—"],
+            ["Learning pace", profile.learningStyle?.pace || "—"],
           ].map(([label, val]) => (
             <div key={label} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
               <span style={{ fontFamily: mono, fontSize: 12, color: "#444", minWidth: 120, flexShrink: 0 }}>{label}</span>
@@ -764,32 +834,24 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
 }
 
 // ─── Result View ──────────────────────────────────────────────────────────────
-function ResultView({ result, urgencyInfo }) {
-  // Fix time split to always add to 100
-  const rawA = result.time_split?.option_a ?? 70;
-  const rawB = result.time_split?.option_b ?? 30;
-  const total = rawA + rawB;
-  const splitA = total > 0 ? Math.round((rawA / total) * 100) : 70;
-  const splitB = 100 - splitA;
-
+function ResultView({ result, urgencyInfo, splitA, splitB }) {
   return (
     <div style={{ animation: "fadeIn 0.4s ease forwards" }}>
-      <div style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", marginBottom: 10, borderLeft: `3px solid ${urgencyInfo?.color || urgencyColor(result.urgency)}` }}>
+      <div style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", marginBottom: 10, borderLeft: `3px solid ${urgencyInfo?.color || "#888"}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase" }}>Decision</div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ background: (urgencyInfo?.color || "#888") + "22", color: urgencyInfo?.color || "#888", fontFamily: mono, fontSize: 11, padding: "4px 11px", borderRadius: 3, textTransform: "uppercase" }}>
-              {urgencyInfo?.label || result.urgency}
-            </span>
-            <span style={{ color: confidenceColor(result.confidence), fontFamily: syne, fontSize: 22, fontWeight: 800 }}>{result.confidence}%</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase" }}>Decision</div>
+            <span style={{ background: (urgencyInfo?.color || "#888") + "22", color: urgencyInfo?.color || "#888", fontFamily: mono, fontSize: 11, padding: "3px 10px", borderRadius: 3, textTransform: "uppercase" }}>{urgencyInfo?.label}</span>
           </div>
+          <span style={{ color: confidenceColor(result.confidence), fontFamily: syne, fontSize: 22, fontWeight: 800 }}>{result.confidence}%</span>
         </div>
-        <div style={{ fontFamily: syne, fontSize: "clamp(19px, 3.5vw, 25px)", fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{result.decision}</div>
+        <div style={{ fontFamily: syne, fontSize: "clamp(19px, 3.5vw, 25px)", fontWeight: 700, color: "#fff", lineHeight: 1.3, marginBottom: 14 }}>{result.decision}</div>
+        <VoiceOutputButton result={result} />
       </div>
 
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
-        <div style={{ display: "flex", gap: 3, height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
+        <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
           <div style={{ width: `${splitA}%`, background: "#fff", transition: "width 1s ease" }} />
           <div style={{ width: `${splitB}%`, background: "#2a2a2a" }} />
         </div>
@@ -828,17 +890,14 @@ function ResultView({ result, urgencyInfo }) {
 
 // ─── History View ─────────────────────────────────────────────────────────────
 function HistoryView({ onSelect }) {
-  if (_history.length === 0) {
-    return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: mono, fontSize: 14, color: "#2a2a2a" }}>No decisions yet this session.</div>;
-  }
+  if (_history.length === 0) return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: mono, fontSize: 14, color: "#2a2a2a" }}>No decisions yet this session.</div>;
   return (
     <div>
       <div style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>This session</div>
       {_history.map((h, i) => (
         <div key={i} onClick={() => onSelect(h)} style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6, padding: "14px 16px", marginBottom: 8, cursor: "pointer" }}
           onMouseEnter={e => e.currentTarget.style.borderColor = "#333"}
-          onMouseLeave={e => e.currentTarget.style.borderColor = "#1a1a1a"}
-        >
+          onMouseLeave={e => e.currentTarget.style.borderColor = "#1a1a1a"}>
           <div style={{ fontFamily: mono, fontSize: 13, color: "#777", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>{h.situation}</div>
           <div style={{ display: "flex", gap: 16, fontFamily: mono, fontSize: 12, color: "#333" }}>
             <span>{h.result.confidence}%</span>
@@ -871,10 +930,7 @@ export default function Nirnayam() {
         setUser(firebaseUser);
         try {
           const savedProfile = await loadProfile(firebaseUser.uid);
-          if (savedProfile) {
-            setProfile(savedProfile);
-            await refreshPersonData(firebaseUser.uid);
-          }
+          if (savedProfile) { setProfile(savedProfile); await refreshPersonData(firebaseUser.uid); }
         } catch (e) { console.error(e); }
         setScreen("landing");
       } else {
@@ -893,17 +949,13 @@ export default function Nirnayam() {
 
   const handleOnboardingComplete = async (newProfile) => {
     setProfile(newProfile);
-    if (user) {
-      try { await saveProfile(user.uid, newProfile); }
-      catch (e) { console.error(e); }
-    }
+    if (user) { try { await saveProfile(user.uid, newProfile); } catch (e) { console.error(e); } }
     setScreen("app");
   };
 
   const handleSignOut = async () => {
     await signOut(auth);
-    setProfile(null); setPersonData(null);
-    setScreen("landing");
+    setProfile(null); setPersonData(null); setScreen("landing");
   };
 
   return (
@@ -928,18 +980,9 @@ export default function Nirnayam() {
           <div style={{ fontFamily: mono, fontSize: 13, color: "#333", animation: "pulse 1.5s ease-in-out infinite" }}>loading...</div>
         </div>
       )}
-
-      {screen === "landing" && (
-        <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />
-      )}
-
-      {screen === "onboarding" && (
-        <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} />
-      )}
-
-      {screen === "app" && profile && (
-        <MainApp profile={profile} user={user} personData={personData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />
-      )}
+      {screen === "landing" && <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />}
+      {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} />}
+      {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
     </div>
   );
 }
