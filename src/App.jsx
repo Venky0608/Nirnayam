@@ -135,8 +135,7 @@ const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
   recognition.lang = "en-IN";
   recognition.onstart = onStart;
   recognition.onresult = (e) => {
-    let interim = "";
-    let final = "";
+    let interim = "", final = "";
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (e.results[i].isFinal) final += e.results[i][0].transcript;
       else interim += e.results[i][0].transcript;
@@ -150,7 +149,6 @@ const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
   return recognition;
 };
 
-// FIX 4: onerror handler added
 const speakText = (text, onStart, onEnd) => {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
@@ -183,8 +181,6 @@ const OPTIONAL = {
 };
 const GRADE_OPTIONS = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 const STREAM_OPTIONS = ["Science (PCM)", "Science (PCB)", "Commerce", "Humanities"];
-
-// FIX: Competitive exams for ALL grades
 const COMPETITIVE_EXAMS_ALL = ["JEE Main", "JEE Advanced", "NEET", "BITSAT", "CUET", "IPMAT", "CLAT", "CA Foundation", "KCET", "MHT CET", "VITEEE", "Other"];
 const COMPETITIVE_EXAMS = {
   "Science (PCM)": ["JEE Main", "JEE Advanced", "BITSAT", "VITEEE", "MHT CET", "KCET", "Other"],
@@ -195,10 +191,10 @@ const COMPETITIVE_EXAMS = {
   "Grade 10": COMPETITIVE_EXAMS_ALL,
 };
 
-// ─── Step labels for timeline ─────────────────────────────────────────────────
-const STEP_LABELS = ["Grade", "Subjects", "Priority", "Goal", "Pressure", "Learning", "About You"];
+// ─── 5-screen step labels ─────────────────────────────────────────────────────
+const STEP_LABELS = ["Subjects", "Goal", "Pressure", "Learning", "About You"];
 
-// ─── PWA install prompt ───────────────────────────────────────────────────────
+// ─── PWA ─────────────────────────────────────────────────────────────────────
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; });
 
@@ -216,6 +212,7 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
   }, []);
 
   const isReturning = user && profile;
+  const isGuest = !user;
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -227,26 +224,41 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center", position: "relative" }}>
       <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`, pointerEvents: "none" }} />
-      <div style={{ position: "relative", zIndex: 1, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 520, width: "100%" }}>
+
+      {/* FIX: Prominent guest warning banner at top */}
+      {isGuest && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50, background: "#1a1200", borderBottom: "1px solid #facc1540", padding: "10px 20px", textAlign: "center" }}>
+          <span style={{ fontFamily: mono, fontSize: 13, color: "#facc15", letterSpacing: "0.04em" }}>
+            ⚠ Guest mode — your profile will not be saved if you close this tab
+          </span>
+        </div>
+      )}
+
+      <div style={{ position: "relative", zIndex: 1, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 520, width: "100%", marginTop: isGuest ? 40 : 0 }}>
         <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
+
         <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 1.8 }}>
           निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision
         </div>
+
         <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
           Nirnayam
         </h1>
         <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
+
         <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
           "Decisions, decisions to make,<br />
           conflicted and lost on the way,<br />
           so Nirnayam's advice you should take,<br />
           so we can be better than yesterday."
         </div>
+
         <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
           Nirnayam is an AI chatbot that helps students make better decisions — whether you're torn between basketball practice and studying, unsure whether to rest or keep grinding, or confused about which subject to tackle first.
         </div>
+
         {!expanded ? (
           <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 32, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
             Why I built this →
@@ -289,18 +301,20 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
               onMouseEnter={e => { if (!authLoading) e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
               {authLoading ? "signing in..." : "Continue with Google"}
             </button>
-            <button onClick={onGuestStart} style={{ background: "transparent", color: "#777", border: "1px solid #333", borderRadius: 5, padding: "12px 36px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 10px", WebkitTapHighlightColor: "transparent" }}>
+            <button onClick={onGuestStart} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", borderRadius: 5, padding: "12px 36px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 14px", WebkitTapHighlightColor: "transparent" }}>
               Continue without account
             </button>
-            {/* FIX: Visible guest warning on landing */}
-            <div style={{ fontFamily: mono, fontSize: 12, color: "#555", lineHeight: 1.7, marginTop: 4 }}>
-              ⚠ Guest mode — your profile won't be saved if you close the tab.<br />
-              <span style={{ color: "#2a2a2a" }}>Sign in to save your profile and enable personalisation.</span>
+            {/* FIX: Bigger, more visible guest warning text */}
+            <div style={{ fontFamily: mono, fontSize: 14, color: "#bbb", lineHeight: 1.9, marginTop: 4, padding: "0 8px" }}>
+              ⚠ Your profile <span style={{ color: "#facc15" }}>won't be saved</span> as a guest.<br />
+              <span style={{ fontSize: 13, color: "#777" }}>Sign in to save your profile and unlock personalisation.</span>
             </div>
           </div>
         )}
+
         <div style={{ marginTop: 20, fontFamily: mono, fontSize: 12, color: "#333" }}>Free · No payment needed</div>
-        <div style={{ marginTop: 28, fontFamily: mono, fontSize: 11, color: "#2a2a2a", letterSpacing: "0.05em" }}>Created by Venkat Sai Varanasi</div>
+        {/* FIX: Slightly bigger "Created by" */}
+        <div style={{ marginTop: 28, fontFamily: mono, fontSize: 13, color: "#3a3a3a", letterSpacing: "0.05em" }}>Created by Venkat Sai Varanasi</div>
       </div>
     </div>
   );
@@ -308,41 +322,65 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
 
 // ─── Onboarding Timeline ──────────────────────────────────────────────────────
 function OnboardingTimeline({ currentStep, totalSteps, labels }) {
+  // FIX: green circles, line runs through them, bigger
+  const CIRCLE = 30;
+  const HALF = CIRCLE / 2;
+
   return (
-    <div style={{ marginBottom: 32 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+    <div style={{ marginBottom: 36 }}>
+      <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        {/* connecting line behind circles */}
+        <div style={{
+          position: "absolute",
+          top: HALF,
+          left: HALF,
+          right: HALF,
+          height: 2,
+          background: "#1a1a1a",
+          zIndex: 0,
+        }} />
+        {/* green progress line */}
+        <div style={{
+          position: "absolute",
+          top: HALF,
+          left: HALF,
+          height: 2,
+          background: "#4ade80",
+          zIndex: 0,
+          width: currentStep === 0 ? "0%" : `${(currentStep / (totalSteps - 1)) * (100 - (HALF / 3))}%`,
+          transition: "width 0.4s ease",
+        }} />
         {labels.map((label, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, minWidth: 0 }}>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", zIndex: 1 }}>
             <div style={{
-              width: 24, height: 24, borderRadius: "50%",
-              background: i < currentStep ? "#fff" : i === currentStep ? "#fff" : "#1a1a1a",
-              border: `1px solid ${i <= currentStep ? "#fff" : "#2a2a2a"}`,
+              width: CIRCLE, height: CIRCLE, borderRadius: "50%",
+              background: i < currentStep ? "#4ade80" : i === currentStep ? "#4ade80" : "#0d0d0d",
+              border: `2px solid ${i <= currentStep ? "#4ade80" : "#2a2a2a"}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontFamily: mono, fontSize: 10,
+              fontFamily: mono, fontSize: 11,
               color: i <= currentStep ? "#000" : "#444",
-              marginBottom: 6, flexShrink: 0,
               transition: "all 0.3s ease",
+              flexShrink: 0,
             }}>
               {i < currentStep ? "✓" : i + 1}
             </div>
+          </div>
+        ))}
+      </div>
+      {/* labels row below circles */}
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        {labels.map((label, i) => (
+          <div key={i} style={{ flex: 1, textAlign: "center" }}>
             <span style={{
               fontFamily: mono,
-              fontSize: "clamp(7px, 1.3vw, 10px)",
-              color: i === currentStep ? "#fff" : i < currentStep ? "#555" : "#2a2a2a",
+              fontSize: "clamp(8px, 1.5vw, 11px)",
+              color: i === currentStep ? "#4ade80" : i < currentStep ? "#4ade8099" : "#2a2a2a",
               letterSpacing: "0.04em",
               textTransform: "uppercase",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: "100%",
-              textAlign: "center",
               transition: "color 0.3s ease",
             }}>{label}</span>
           </div>
         ))}
-      </div>
-      <div style={{ background: "#1a1a1a", borderRadius: 3, height: 2 }}>
-        <div style={{ height: "100%", background: "#fff", borderRadius: 3, width: `${(currentStep / (totalSteps - 1)) * 100}%`, transition: "width 0.4s ease" }} />
       </div>
     </div>
   );
@@ -368,14 +406,44 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
   const examList = streamKey ? (COMPETITIVE_EXAMS[streamKey] || COMPETITIVE_EXAMS_ALL) : COMPETITIVE_EXAMS_ALL;
   const showCompetitiveExam = answers.academicGoal === "Crack a competitive exam";
 
+  // ── 5 screens ────────────────────────────────────────────────────────────
   const QUESTIONS = [
-    { id: "grade_stream", label: "Grade", question: "What grade are you in?", subtitle: "Select your grade and stream if applicable", type: "grade_stream" },
-    { id: "stream_subjects", label: "Subjects", question: "What subjects do you study?", subtitle: "Select any additional subjects you take", type: "subjects" },
-    { id: "subjectPriority", label: "Priority", question: "Rank your subjects by importance", subtitle: "Drag and Drop OR Use arrows — top = most important", type: "rank" },
-    { id: "goal", label: "Goal", question: "What is your main academic goal?", subtitle: showCompetitiveExam ? "Select your goal and which exam you're targeting" : "This shapes every piece of advice Nirnayam gives you", type: "goal" },
-    { id: "pressure", label: "Pressure", question: "How do you handle pressure?", subtitle: "Be honest — this calibrates your advice", type: "pressure" },
-    { id: "learningStyle", label: "Learning", question: "How do you learn?", subtitle: "Helps Nirnayam give smarter time estimates", type: "learning" },
-    { id: "about", label: "About You", question: "Tell us a bit more about you", subtitle: "Optional — the more context, the better the advice", type: "about", optional: true },
+    {
+      id: "grade_subjects",
+      label: "Subjects",
+      question: "Your grade and subjects",
+      subtitle: "Select your grade, stream (if 11/12), and any extra subjects",
+      type: "grade_subjects",
+    },
+    {
+      id: "priority_goal",
+      label: "Goal",
+      question: "Priorities and your goal",
+      subtitle: "Rank your subjects, then tell us what you're working towards",
+      type: "priority_goal",
+    },
+    {
+      id: "pressure",
+      label: "Pressure",
+      question: "How do you handle pressure?",
+      subtitle: "Be honest — this calibrates your advice",
+      type: "pressure",
+    },
+    {
+      id: "learningStyle",
+      label: "Learning",
+      question: "How do you learn?",
+      subtitle: "Helps Nirnayam give smarter time estimates",
+      type: "learning",
+    },
+    {
+      id: "about",
+      label: "About You",
+      question: "Tell us a bit more about you",
+      subtitle: "Optional — the more context, the better the advice",
+      type: "about",
+      optional: true,
+    },
   ];
 
   const q = QUESTIONS[step];
@@ -384,14 +452,16 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
   const canProceed = () => {
     if (!q) return true;
     if (q.optional) return true;
-    if (q.id === "grade_stream") {
+    if (q.id === "grade_subjects") {
       if (!answers.grade) return false;
       if ((answers.grade === "Grade 11" || answers.grade === "Grade 12") && !stream) return false;
       return true;
     }
-    if (q.id === "stream_subjects") return true;
-    if (q.type === "rank") return answers.subjectPriority.length > 0;
-    if (q.id === "goal") return answers.academicGoal !== "";
+    if (q.id === "priority_goal") {
+      if (answers.subjectPriority.length === 0) return false;
+      if (!answers.academicGoal) return false;
+      return true;
+    }
     if (q.id === "pressure") return answers.deadlineResponse !== "";
     if (q.type === "learning") return answers.learningStyle.pace !== "" && answers.learningStyle.doubtTime !== "";
     return true;
@@ -405,7 +475,10 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
   };
 
   const next = () => {
-    if (q.id === "stream_subjects") setAnswers(a => ({ ...a, subjectPriority: [...compulsory, ...a.optionalSubjects] }));
+    // when leaving grade_subjects, auto-populate subjectPriority
+    if (q.id === "grade_subjects") {
+      setAnswers(a => ({ ...a, subjectPriority: [...compulsory, ...a.optionalSubjects] }));
+    }
     if (step < QUESTIONS.length - 1) setStep(s => s + 1);
     else onComplete({ ...answers, stream, allSubjects });
   };
@@ -447,110 +520,112 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     WebkitTapHighlightColor: "transparent", minHeight: 52,
   });
 
+  const sectionLabel = (text) => (
+    <div style={{ fontFamily: mono, fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12, marginTop: 24 }}>{text}</div>
+  );
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 20px" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "32px 20px 60px" }}>
       <div style={{ width: "100%", maxWidth: 560 }}>
         {step === 0 && (
           <div style={{ fontFamily: mono, fontSize: 13, color: "#777", textAlign: "center", marginBottom: 28, lineHeight: 1.8, padding: "14px 20px", border: "1px solid #1e1e1e", borderRadius: 6, background: "#0a0a0a" }}>
-            Answer these questions honestly, so Nirnayam can get to know you and make the best decisions for you.
+            Answer these honestly — the more Nirnayam knows you, the better the advice.
           </div>
         )}
 
         <OnboardingTimeline currentStep={step} totalSteps={QUESTIONS.length} labels={STEP_LABELS} />
 
         <div key={step} style={{ animation: "fadeIn 0.3s ease forwards" }}>
-          <h2 style={{ fontFamily: syne, fontSize: "clamp(24px, 5.5vw, 34px)", fontWeight: 700, color: "#fff", margin: "0 0 10px", lineHeight: 1.2 }}>{q.question}</h2>
-          {q.subtitle && <p style={{ fontFamily: mono, fontSize: 14, color: "#888", margin: "0 0 26px", lineHeight: 1.7 }}>{q.subtitle}</p>}
-          {!q.subtitle && <div style={{ marginBottom: 26 }} />}
+          <h2 style={{ fontFamily: syne, fontSize: "clamp(22px, 5vw, 30px)", fontWeight: 700, color: "#fff", margin: "0 0 8px", lineHeight: 1.2 }}>{q.question}</h2>
+          {q.subtitle && <p style={{ fontFamily: mono, fontSize: 13, color: "#777", margin: "0 0 20px", lineHeight: 1.7 }}>{q.subtitle}</p>}
 
-          {/* Step 1: Grade + Stream */}
-          {q.id === "grade_stream" && (
+          {/* ── Screen 1: Grade + Stream + Subjects ── */}
+          {q.id === "grade_subjects" && (
             <div>
-              <div style={{ fontFamily: mono, fontSize: 12, color: "#666", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>Grade</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 24 }}>
+              {sectionLabel("Grade")}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 {GRADE_OPTIONS.map(opt => (
                   <button key={opt} onClick={() => { setAnswers(a => ({ ...a, grade: opt, optionalSubjects: [] })); if (opt === "Grade 9" || opt === "Grade 10") setStream(""); }}
                     style={{ ...btnStyle(answers.grade === opt), flex: "1 1 calc(50% - 5px)" }}>{opt}</button>
                 ))}
               </div>
+
               {(answers.grade === "Grade 11" || answers.grade === "Grade 12") && (
-                <div>
-                  <div style={{ fontFamily: mono, fontSize: 12, color: "#666", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>Stream</div>
+                <>
+                  {sectionLabel("Stream")}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                     {STREAM_OPTIONS.map(s => (
                       <button key={s} onClick={() => { setStream(s); setAnswers(a => ({ ...a, optionalSubjects: [] })); }}
                         style={{ ...btnStyle(stream === s), flex: "1 1 calc(50% - 5px)" }}>{s}</button>
                     ))}
                   </div>
-                </div>
+                </>
               )}
-            </div>
-          )}
 
-          {/* Step 2: Subjects */}
-          {q.id === "stream_subjects" && (
-            <div>
               {compulsory.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontFamily: mono, fontSize: 12, color: "#666", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>Core subjects — already included</div>
+                <>
+                  {sectionLabel("Core subjects — already included")}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {compulsory.map(sub => <div key={sub} style={{ background: "#111", border: "1px solid #2a2a2a", borderRadius: 5, padding: "11px 14px", fontFamily: mono, fontSize: 13, color: "#777" }}>{sub} ✓</div>)}
+                    {compulsory.map(sub => (
+                      <div key={sub} style={{ background: "#111", border: "1px solid #2a2a2a", borderRadius: 5, padding: "11px 14px", fontFamily: mono, fontSize: 13, color: "#555" }}>{sub} ✓</div>
+                    ))}
                   </div>
-                </div>
+                </>
               )}
+
               {optionalList.length > 0 && (
-                <div>
-                  <div style={{ fontFamily: mono, fontSize: 12, color: "#666", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>Additional subjects — pick any you study</div>
+                <>
+                  {sectionLabel("Additional subjects — pick any you study")}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {optionalList.map(sub => <button key={sub} onClick={() => handleOptionalSubject(sub)} style={{ ...btnStyle(answers.optionalSubjects.includes(sub)), padding: "11px 14px" }}>{sub}</button>)}
+                    {optionalList.map(sub => (
+                      <button key={sub} onClick={() => handleOptionalSubject(sub)}
+                        style={{ ...btnStyle(answers.optionalSubjects.includes(sub)), padding: "11px 14px" }}>{sub}</button>
+                    ))}
                   </div>
-                </div>
+                </>
               )}
             </div>
           )}
 
-          {/* Step 3: Rank */}
-          {q.type === "rank" && (
+          {/* ── Screen 2: Priority + Goal ── */}
+          {q.id === "priority_goal" && (
             <div>
+              {sectionLabel("Rank your subjects — Drag and Drop OR use ↑↓ arrows")}
               {answers.subjectPriority.length === 0 ? (
-                <div style={{ fontFamily: mono, fontSize: 14, color: "#666" }}>No subjects selected. Go back and select your subjects.</div>
+                <div style={{ fontFamily: mono, fontSize: 14, color: "#555", padding: "12px 0" }}>No subjects found. Go back and select your subjects.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {answers.subjectPriority.map((sub, i) => (
                     <div key={sub} draggable onDragStart={() => handleDragStart(i)} onDragOver={(e) => handleDragOver(e, i)} onDragEnd={handleDragEnd}
-                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "15px 16px", background: dragIdx === i ? "#1e1e1e" : "#0d0d0d", border: `1px solid ${dragIdx === i ? "#444" : "#2a2a2a"}`, borderRadius: 5, cursor: "grab", userSelect: "none", WebkitUserSelect: "none" }}>
-                      <span style={{ fontFamily: mono, fontSize: 13, color: "#555", minWidth: 24 }}>{i + 1}</span>
-                      <span style={{ fontFamily: mono, fontSize: 15, color: "#ddd", flex: 1 }}>{sub}</span>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        <button onClick={() => moveItem(i, i - 1)} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 3, color: "#666", cursor: "pointer", fontSize: 13, padding: "4px 10px", WebkitTapHighlightColor: "transparent" }}>↑</button>
-                        <button onClick={() => moveItem(i, i + 1)} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 3, color: "#666", cursor: "pointer", fontSize: 13, padding: "4px 10px", WebkitTapHighlightColor: "transparent" }}>↓</button>
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", background: dragIdx === i ? "#1e1e1e" : "#0d0d0d", border: `1px solid ${dragIdx === i ? "#444" : "#2a2a2a"}`, borderRadius: 5, cursor: "grab", userSelect: "none", WebkitUserSelect: "none" }}>
+                      <span style={{ fontFamily: mono, fontSize: 12, color: "#444", minWidth: 20 }}>{i + 1}</span>
+                      <span style={{ fontFamily: mono, fontSize: 14, color: "#ddd", flex: 1 }}>{sub}</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        <button onClick={() => moveItem(i, i - 1)} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 3, color: "#555", cursor: "pointer", fontSize: 12, padding: "3px 9px", WebkitTapHighlightColor: "transparent" }}>↑</button>
+                        <button onClick={() => moveItem(i, i + 1)} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 3, color: "#555", cursor: "pointer", fontSize: 12, padding: "3px 9px", WebkitTapHighlightColor: "transparent" }}>↓</button>
                       </div>
                     </div>
                   ))}
-                  <div style={{ fontFamily: mono, fontSize: 11, color: "#333", marginTop: 4 }}>☰ Drag and Drop OR use ↑↓ arrows to reorder</div>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Step 4: Goal + Exam */}
-          {q.id === "goal" && (
-            <div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: showCompetitiveExam ? 24 : 0 }}>
+              {sectionLabel("Main academic goal")}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {["Score well in board exams", "Crack a competitive exam", "Maintain my current grades", "Improve in specific subjects", "No specific goal right now"].map(opt => (
-                  <button key={opt} onClick={() => setAnswers(a => ({ ...a, academicGoal: opt, competitiveExam: "", customExam: "" }))} style={btnStyle(answers.academicGoal === opt)}>{opt}</button>
+                  <button key={opt} onClick={() => setAnswers(a => ({ ...a, academicGoal: opt, competitiveExam: "", customExam: "" }))}
+                    style={btnStyle(answers.academicGoal === opt)}>{opt}</button>
                 ))}
               </div>
+
               {showCompetitiveExam && (
                 <div style={{ animation: "fadeIn 0.3s ease forwards" }}>
-                  <div style={{ fontFamily: mono, fontSize: 12, color: "#666", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12, marginTop: 8 }}>Which exam?</div>
+                  {sectionLabel("Which exam?")}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {examList.map(opt => (
                       <button key={opt} onClick={() => setAnswers(a => ({ ...a, competitiveExam: opt, customExam: "" }))}
                         style={{ ...btnStyle(answers.competitiveExam === opt), padding: "11px 14px" }}>{opt}</button>
                     ))}
                   </div>
-                  {/* FIX: "Other" text field */}
                   {answers.competitiveExam === "Other" && (
                     <input type="text" value={answers.customExam || ""} onChange={e => setAnswers(a => ({ ...a, customExam: e.target.value }))}
                       placeholder="Type your exam name..."
@@ -562,7 +637,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             </div>
           )}
 
-          {/* Step 5: Pressure */}
+          {/* ── Screen 3: Pressure ── */}
           {q.id === "pressure" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
               <div>
@@ -592,7 +667,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             </div>
           )}
 
-          {/* Step 6: Learning */}
+          {/* ── Screen 4: Learning ── */}
           {q.type === "learning" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div>
@@ -630,7 +705,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             </div>
           )}
 
-          {/* Step 7: About */}
+          {/* ── Screen 5: About You ── */}
           {q.id === "about" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div>
@@ -657,14 +732,13 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
         </div>
 
         {isLastStep && !user && (
-          <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginTop: 20, padding: "10px 14px", border: "1px solid #1a1a1a", borderRadius: 5, lineHeight: 1.7 }}>
-            ⚠ You're continuing as a guest. Your profile won't be saved if you refresh or close the tab.
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#bbb", marginTop: 20, padding: "12px 16px", border: "1px solid #facc1540", borderRadius: 5, lineHeight: 1.7, background: "#1a120000" }}>
+            ⚠ Continuing as a guest — your profile <span style={{ color: "#facc15" }}>won't be saved</span> if you close the tab.
           </div>
         )}
 
-        {/* FIX: Back button at bottom */}
-        <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <button onClick={back} disabled={step === 0} style={{ background: "transparent", border: "none", color: step === 0 ? "#1e1e1e" : "#888", fontFamily: mono, fontSize: 14, cursor: step === 0 ? "default" : "pointer", WebkitTapHighlightColor: "transparent", padding: "4px 0" }}>
+        <div style={{ marginTop: 28, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <button onClick={back} disabled={step === 0} style={{ background: "transparent", border: "none", color: step === 0 ? "#1e1e1e" : "#777", fontFamily: mono, fontSize: 14, cursor: step === 0 ? "default" : "pointer", WebkitTapHighlightColor: "transparent", padding: "4px 0" }}>
             {step > 0 ? "← Back" : ""}
           </button>
           <button onClick={next} disabled={!canProceed()} style={{ background: canProceed() ? "#fff" : "#1a1a1a", color: canProceed() ? "#000" : "#333", border: "none", borderRadius: 5, padding: "15px 34px", fontFamily: mono, fontSize: 14, cursor: canProceed() ? "pointer" : "not-allowed", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
@@ -697,7 +771,7 @@ function VoiceInputButton({ onTranscript, onError }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <button onClick={toggle} title={listening ? "Tap to stop" : "Tap to speak your situation"} style={{
+      <button onClick={toggle} title={listening ? "Tap to stop" : "Tap to speak"} style={{
         background: listening ? "#f87171" : "transparent",
         border: `1px solid ${listening ? "#f87171" : "#333"}`,
         borderRadius: 5, padding: "10px 14px",
@@ -721,14 +795,12 @@ function VoiceInputButton({ onTranscript, onError }) {
 // ─── Voice Output Button ──────────────────────────────────────────────────────
 function VoiceOutputButton({ result }) {
   const [speaking, setSpeaking] = useState(false);
-
   const toggle = () => {
     if (speaking) { window.speechSynthesis?.cancel(); setSpeaking(false); return; }
     const text = `Decision: ${result.decision}. Key insight: ${result.key_insight}. Action plan: ${result.action_plan?.join(". ")}.${result.warning && result.warning !== "null" ? ` Warning: ${result.warning}` : ""}`;
     try { speakText(text, () => setSpeaking(true), () => setSpeaking(false)); }
     catch { setSpeaking(false); }
   };
-
   if (!window.speechSynthesis) return null;
   return (
     <button onClick={toggle} style={{
@@ -800,10 +872,10 @@ function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
 
 // ─── Result Skeleton ──────────────────────────────────────────────────────────
 function ResultSkeleton() {
-  const shimmer = { background: "linear-gradient(90deg, #111 25%, #1a1a1a 50%, #111 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", borderRadius: 4 };
+  const shimmer = { background: "linear-gradient(90deg,#111 25%,#1a1a1a 50%,#111 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", borderRadius: 4 };
   return (
     <div style={{ animation: "fadeIn 0.3s ease forwards" }}>
-      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
       <div style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ ...shimmer, height: 16, width: 120 }} />
@@ -816,11 +888,10 @@ function ResultSkeleton() {
         <div style={{ ...shimmer, height: 12, width: 140, marginBottom: 16 }} />
         <div style={{ ...shimmer, height: 8, width: "100%", marginBottom: 10 }} />
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div style={{ ...shimmer, height: 12, width: 80 }} />
-          <div style={{ ...shimmer, height: 12, width: 80 }} />
+          <div style={{ ...shimmer, height: 12, width: 80 }} /><div style={{ ...shimmer, height: 12, width: 80 }} />
         </div>
       </div>
-      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
+      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px" }}>
         <div style={{ ...shimmer, height: 12, width: 100, marginBottom: 14 }} />
         <div style={{ ...shimmer, height: 16, width: "85%", marginBottom: 8 }} />
         <div style={{ ...shimmer, height: 16, width: "60%" }} />
@@ -881,7 +952,6 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto" }}>
 
-      {/* FIX: Edit profile confirmation dialog */}
       {showEditConfirm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 10, padding: 28, maxWidth: 380, width: "100%", textAlign: "center" }}>
@@ -903,21 +973,28 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
           </button>
           <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginTop: 3 }}>
             {profile.grade}{profile.stream ? ` · ${profile.stream}` : ""}
-            {!user && <span style={{ color: "#2a2a2a", marginLeft: 6 }}>· guest</span>}
+            {!user && <span style={{ color: "#facc15", marginLeft: 6 }}>· guest</span>}
             {personData && personData.total > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· personalised ({personData.total})</span>}
           </div>
         </div>
+
+        {/* FIX: History LEFT, Settings RIGHT — swapped */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          {/* FIX: Settings with arrow hint */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 5 }}>
-              ⚙ settings
-            </button>
-            <div style={{ fontFamily: mono, fontSize: 10, color: "#2a2a2a", paddingLeft: 2 }}>↑ change profile here</div>
-          </div>
+          {/* History — left */}
           <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
             {showHistory ? "← back" : `history (${history.length})`}
           </button>
+
+          {/* Settings — right with arrow hint */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+            <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 5 }}>
+              ⚙ settings
+            </button>
+            {/* FIX: Bigger, more visible arrow hint */}
+            <div style={{ fontFamily: mono, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 4 }}>
+              ↑ change profile here
+            </div>
+          </div>
         </div>
       </div>
 
@@ -941,15 +1018,9 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
             </div>
           </div>
 
-          {voiceError && (
-            <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "10px 14px", fontFamily: mono, fontSize: 12, color: "#f87171", marginBottom: 10 }}>{voiceError}</div>
-          )}
-
-          {/* FIX: Loading skeleton instead of abrupt pop */}
+          {voiceError && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "10px 14px", fontFamily: mono, fontSize: 12, color: "#f87171", marginBottom: 10 }}>{voiceError}</div>}
           {loading && <ResultSkeleton />}
-
           {error && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: mono, fontSize: 13, color: "#f87171" }}>{error}</div>}
-
           {result && !loading && (
             <>
               <ResultView result={result} urgencyInfo={urgencyInfo} splitA={splitA} splitB={splitB} labelA={labelA} labelB={labelB} />
@@ -1031,8 +1102,6 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
         Edit profile
       </button>
       <div style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a", textAlign: "center", marginBottom: 28 }}>Editing will re-run the onboarding questionnaire</div>
-
-      {/* FIX: Back button at bottom of settings */}
       <button onClick={onBack} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "10px 20px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "block", margin: "0 auto" }}>← Back</button>
     </div>
   );
@@ -1054,7 +1123,6 @@ function ResultView({ result, urgencyInfo, splitA, splitB, labelA, labelB }) {
         <VoiceOutputButton result={result} />
       </div>
 
-      {/* FIX: Time split with real labels */}
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
         <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
@@ -1075,10 +1143,10 @@ function ResultView({ result, urgencyInfo, splitA, splitB, labelA, labelB }) {
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Action plan</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {result.action_plan?.map((step, i) => (
+          {result.action_plan?.map((s, i) => (
             <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
               <div style={{ width: 28, height: 28, border: "1px solid #2a2a2a", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: mono, fontSize: 12, color: "#555" }}>{i + 1}</div>
-              <span style={{ fontFamily: mono, fontSize: 14, color: "#ccc", lineHeight: 1.7 }}>{step}</span>
+              <span style={{ fontFamily: mono, fontSize: 14, color: "#ccc", lineHeight: 1.7 }}>{s}</span>
             </div>
           ))}
         </div>
