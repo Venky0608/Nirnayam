@@ -8,7 +8,7 @@ const mono = "'DM Mono', monospace";
 const syne = "'Syne', sans-serif";
 const urgencyColor = (u) => ({ low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171" }[u] || "#888");
 const confidenceColor = (c) => c >= 75 ? "#4ade80" : c >= 50 ? "#facc15" : "#f87171";
-
+const SPLIT_COLORS = ["#ffffff", "#4ade80", "#facc15", "#fb923c", "#818cf8"];
 const getUrgencyLabel = (confidence) => {
   if (confidence >= 90) return { label: "critical", color: "#f87171" };
   if (confidence >= 80) return { label: "important", color: "#fb923c" };
@@ -99,11 +99,11 @@ CATEGORIES: Study / Activity / Split / Priority
 
 RULES: One clear recommendation. Direct like a smart older sibling. Use subject priority order to break ties. Factor in deadline response and learning pace. Be specific and actionable.
 
-TIME SPLIT: Always include option_a_label and option_b_label describing what the two options actually are (e.g. "Study" and "Practice", "Rest" and "Revision").
+TIME SPLIT: Use a "splits" array — one entry per activity the student mentioned. Labels must be specific (e.g. "Physics", "Rest", "Basketball"). Percentages must be whole numbers and add to exactly 100. Minimum 2 splits, maximum 5. Do NOT default to 70/30. Reflect the actual situation realistically.
 
 Respond ONLY in this JSON, no preamble, no backticks:
-{"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","time_split":{"option_a":70,"option_b":30,"option_a_label":"Study","option_b_label":"Practice"},"key_insight":"one thing that tips this","action_plan":["step 1","step 2","step 3"],"warning":"one thing to watch or null"}
-time_split values must be whole numbers and add to exactly 100.`;
+{"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","splits":[{"label":"Math","percent":50},{"label":"Chemistry","percent":30},{"label":"Rest","percent":20}],"key_insight":"one thing that tips this","action_plan":["step 1","step 2","step 3"],"warning":"one thing to watch or null"}
+splits must be whole numbers and add to exactly 100.`
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
@@ -847,7 +847,7 @@ function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
         ))}
       </div>
       <div style={{ fontFamily: mono, fontSize: 12, color: "#444", textAlign: "center" }}>
-        {selected === 0 ? "Rate to help Nirnayam learn your patterns" : selected <= 2 ? "Got it — Nirnayam will adjust" : selected <= 3 ? "Thanks for the feedback" : "Great — Nirnayam will remember this works"}
+        {selected === 0 ? "Did Nirnayam's advice actually help you?" : selected <= 2 ? "Got it — Nirnayam will adjust" : selected <= 3 ? "Thanks for the feedback" : "Great — Nirnayam will remember this works"}
       </div>
       {showSignInPrompt && (
         <div style={{ marginTop: 16, background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "16px", textAlign: "center" }}>
@@ -934,14 +934,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   );
 
   const urgencyInfo = result ? getUrgencyLabel(result.confidence) : null;
-  const rawA = result?.time_split?.option_a ?? 70;
-  const rawB = result?.time_split?.option_b ?? 30;
-  const total = rawA + rawB;
-  const splitA = total > 0 ? Math.round((rawA / total) * 100) : 70;
-  const splitB = 100 - splitA;
-  const labelA = result?.time_split?.option_a_label || "Primary";
-  const labelB = result?.time_split?.option_b_label || "Secondary";
-
+  
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto" }}>
 
@@ -1016,7 +1009,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
           {error && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: mono, fontSize: 13, color: "#f87171" }}>{error}</div>}
           {result && !loading && (
             <>
-              <ResultView result={result} urgencyInfo={urgencyInfo} splitA={splitA} splitB={splitB} labelA={labelA} labelB={labelB} />
+              <ResultView result={result} urgencyInfo={urgencyInfo} />
               <StarRating result={result} situation={situation} user={user} onGoogleSignIn={onGoogleSignIn} onRated={onPersonDataRefresh} />
             </>
           )}
@@ -1101,7 +1094,7 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
 }
 
 // ─── Result View ──────────────────────────────────────────────────────────────
-function ResultView({ result, urgencyInfo, splitA, splitB, labelA, labelB }) {
+function ResultView({ result, urgencyInfo }) {
   return (
     <div style={{ animation: "fadeIn 0.4s ease forwards" }}>
       <div style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", marginBottom: 10, borderLeft: `3px solid ${urgencyInfo?.color || "#888"}` }}>
@@ -1117,16 +1110,24 @@ function ResultView({ result, urgencyInfo, splitA, splitB, labelA, labelB }) {
       </div>
 
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
-        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
-        <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 }}>
-          <div style={{ width: `${splitA}%`, background: "#fff", transition: "width 1s ease" }} />
-          <div style={{ width: `${splitB}%`, background: "#2a2a2a" }} />
+  <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
+  <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 14 }}>
+    {(result.splits || []).map((s, i) => (
+      <div key={i} style={{ width: `${s.percent}%`, background: SPLIT_COLORS[i % SPLIT_COLORS.length], transition: "width 1s ease" }} />
+    ))}
+  </div>
+  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    {(result.splits || []).map((s, i) => (
+      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: SPLIT_COLORS[i % SPLIT_COLORS.length], flexShrink: 0 }} />
+          <span style={{ fontFamily: mono, fontSize: 13, color: i === 0 ? "#ccc" : "#666" }}>{s.label}</span>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 13 }}>
-          <span style={{ color: "#ccc" }}>{labelA} — {splitA}%</span>
-          <span style={{ color: "#555" }}>{labelB} — {splitB}%</span>
-        </div>
+        <span style={{ fontFamily: mono, fontSize: 13, color: i === 0 ? "#ccc" : "#555" }}>{s.percent}%</span>
       </div>
+    ))}
+  </div>
+</div>
 
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Key insight</div>
