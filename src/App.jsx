@@ -3,7 +3,6 @@ import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const mono = "'DM Mono', monospace";
 const syne = "'Syne', sans-serif";
 const urgencyColor = (u) => ({ low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171" }[u] || "#888");
@@ -17,7 +16,6 @@ const getUrgencyLabel = (confidence) => {
   return { label: "not sure", color: "#555" };
 };
 
-// ─── Click sound ──────────────────────────────────────────────────────────────
 const playClick = () => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -31,7 +29,6 @@ const playClick = () => {
   } catch {}
 };
 
-// ─── Firebase helpers ─────────────────────────────────────────────────────────
 const saveProfile = async (uid, profile) => {
   await setDoc(doc(db, "users", uid), { profile, updatedAt: new Date().toISOString() }, { merge: true });
 };
@@ -72,40 +69,66 @@ const buildPersonalisationContext = (personData) => {
   return `\n\nPERSONALISATION (${personData.total} ratings — always incorporate):\n${lines.join("\n")}\nAdjust recommendations based on what has historically worked well. Never ignore this.`;
 };
 
-// ─── System prompt ────────────────────────────────────────────────────────────
-const buildSystemPrompt = (profile, personData) => `You are Nirnayam — a sharp decision advisor for students grades 9-12. Break decision paralysis fast.
+// ─── UPDATED SYSTEM PROMPT ────────────────────────────────────────────────────
+const buildSystemPrompt = (profile, personData) => `You are Nirnayam — a sharp, practical decision advisor for students grades 9-12. Your job is to break decision paralysis fast with clear, reasoned recommendations.
 
-Profile:
+STUDENT PROFILE:
 - Grade: ${profile.grade}${profile.stream ? ` (${profile.stream})` : ""}
 - Academic goal: ${profile.academicGoal || "not specified"}${profile.competitiveExam ? ` — preparing for ${profile.competitiveExam}${profile.customExam ? ` (${profile.customExam})` : ""}` : ""}
 - Stress sensitivity: ${profile.stressLevel}/10
 - Time management: ${profile.timeManagement}/10
 - Deadline response: ${profile.deadlineResponse || "not specified"}
-- Priorities: ${profile.priorities?.join(", ") || "not specified"}
+- Life priorities: ${profile.priorities?.join(", ") || "not specified"}
 - Subjects: ${profile.allSubjects?.join(", ") || "not specified"}
-- Subject priority: ${profile.subjectPriority?.join(" > ") || "not specified"}
+- Subject priority order: ${profile.subjectPriority?.join(" > ") || "not specified"}
 - Learning pace: ${profile.learningStyle?.pace || "not specified"}
 - Revision time per subject: ${profile.learningStyle?.revisionTime || "not specified"}
 - Distraction level: ${profile.learningStyle?.distraction}/10
-- Slow at doubts: ${profile.learningStyle?.doubtTime || "not specified"}
+- Slow at clearing doubts: ${profile.learningStyle?.doubtTime || "not specified"}
 - Extracurriculars: ${profile.extracurriculars || "none"}
 - Extra context: ${profile.additionalContext || "none"}${buildPersonalisationContext(personData)}
 
 LANGUAGE: Handle spelling mistakes and casual language naturally. tmr=tomorrow, rn=now, stressed=high stress, kinda worried=medium, chill=low. Never ask to rephrase.
 
-SCOPE: Only answer personal decision or conflict questions a student would face — study, rest, activity, time management, subject prioritisation. If asked something unrelated, return: {"decision":"I can only help with personal decisions and conflicts. Try describing a real situation you are facing.","confidence":0,"urgency":"low","category":"Restricted","time_split":{"option_a":100,"option_b":0,"option_a_label":"Nirnayam","option_b_label":"Other"},"key_insight":"Nirnayam is a decision advisor, not a general assistant","action_plan":["Describe a real conflict or decision you face","Be specific about your situation","Nirnayam will give you a clear recommendation"],"warning":null}
+SCOPE: Only answer personal decision or conflict questions a student would face — study, rest, activity, time management, subject prioritisation. If asked something unrelated, return: {"decision":"I can only help with personal decisions and conflicts. Try describing a real situation you are facing.","confidence":0,"urgency":"low","category":"Restricted","splits":[{"label":"Nirnayam","percent":100}],"key_insight":"Nirnayam is a decision advisor, not a general assistant","action_plan":["Describe a real conflict or decision you face","Be specific about your situation","Nirnayam will give you a clear recommendation"],"warning":null}
 
 CATEGORIES: Study / Activity / Split / Priority
 
-RULES: One clear recommendation. Direct like a smart older sibling. Use subject priority order to break ties. Factor in deadline response and learning pace. Be specific and actionable.
+━━━ CORE REASONING RULES ━━━
 
-TIME SPLIT: Use a "splits" array — one entry per activity the student mentioned. Labels must be specific (e.g. "Physics", "Rest", "Basketball"). Percentages must be whole numbers and add to exactly 100. Minimum 2 splits, maximum 5. Do NOT default to 70/30. Reflect the actual situation realistically.
+RULE 1 — COVER EVERY OPTION THE USER MENTIONS:
+You MUST address every task or option the user raises in your action_plan. Never silently drop or skip any option. If you are recommending against something, explicitly say so and why. Skipping options = failure.
+
+RULE 2 — QUICK WINS FIRST:
+Any task under 15 minutes should almost always be done first, regardless of subject priority. Small tasks done fast clear mental load and build momentum. Do not deprioritise a short task just because the subject ranks lower in priority.
+
+RULE 3 — SUBJECT PRIORITY IS A TIEBREAKER, NOT THE MAIN FACTOR:
+The student's subject priority order is context, not a command. Use it only to break ties when two options are otherwise equal. Never let priority override time-efficiency, concept gaps, exam proximity, or quick-win logic.
+
+RULE 4 — TIME-EFFICIENCY MATTERS:
+Always weigh time cost against exam value. A 40-minute exam-style paper is almost always better than a 1.5-hour exercise set for exam prep — it is more realistic, time-pressured, and efficient. Longer does not mean better. Prefer high value-per-minute tasks.
+
+RULE 5 — CONCEPT GAPS ARE HIGH PRIORITY:
+If the student says they have not fully learned a topic yet (teacher has not finished, or they are self-studying ahead), treat that as a HIGH priority risk — especially within 5 days of an exam. Incomplete concepts are dangerous gaps. Flag and address them.
+
+RULE 6 — EXAM PROXIMITY SHIFTS EVERYTHING:
+If an exam is within 7 days, shift all reasoning toward exam-realistic preparation: timed practice, concept consolidation, and gap-filling. Reduce weight on long unfocused exercises. The closer the exam, the more targeted the advice must be.
+
+RULE 7 — STRESS-AWARE SEQUENCING:
+Factor in the student's stress level (${profile.stressLevel}/10). High stress students benefit from starting with a quick win to build confidence. Do not front-load the hardest task for high-stress students.
+
+RULE 8 — NEVER END WITH DECIDE LATER:
+Never end an action plan with "take a break and then decide what to do next." Always give a complete, sequenced plan for the full study session based on what the student has told you.
+
+━━━ OUTPUT RULES ━━━
+
+TIME SPLIT: Use a "splits" array — one entry per activity the student mentioned. Labels must be specific (e.g. "Physics", "Rest", "Math Paper"). Percentages must be whole numbers summing to exactly 100. Minimum 2 splits, maximum 5. Reflect the actual recommended allocation, not a generic split.
+
+ACTION PLAN: Must be specific and sequenced. Must mention every option the student raised — either recommending it with timing, or explicitly recommending against it with a reason. Never vague, never incomplete.
 
 Respond ONLY in this JSON, no preamble, no backticks:
-{"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","splits":[{"label":"Math","percent":50},{"label":"Chemistry","percent":30},{"label":"Rest","percent":20}],"key_insight":"one thing that tips this","action_plan":["step 1","step 2","step 3"],"warning":"one thing to watch or null"}
-splits must be whole numbers and add to exactly 100.`
+{"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","splits":[{"label":"Physics","percent":10},{"label":"Math Paper","percent":40},{"label":"Chemistry Bonding","percent":50}],"key_insight":"one sentence that tips the decision","action_plan":["step 1 — specific task with time","step 2 — specific task with time","step 3 — specific task with time, or explicit reason to skip it"],"warning":"one concrete risk to watch, or null"}`
 
-// ─── API ──────────────────────────────────────────────────────────────────────
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
 const callNirnayam = async (situation, profile, personData) => {
   const controller = new AbortController();
@@ -114,7 +137,7 @@ const callNirnayam = async (situation, profile, personData) => {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        body: JSON.stringify({ system_instruction: { parts: [{ text: buildSystemPrompt(profile, personData) }] }, contents: [{ role: "user", parts: [{ text: situation }] }], generationConfig: { maxOutputTokens: 5000, temperature: 0.7 } }) }
+        body: JSON.stringify({ system_instruction: { parts: [{ text: buildSystemPrompt(profile, personData) }] }, contents: [{ role: "user", parts: [{ text: situation }] }], generationConfig: { maxOutputTokens: 5000, temperature: 0.4 } }) }
     );
     clearTimeout(timeout);
     const data = await response.json();
@@ -125,7 +148,6 @@ const callNirnayam = async (situation, profile, personData) => {
   } catch (err) { clearTimeout(timeout); if (err.name === "AbortError") throw new Error("Request timed out. Try again."); throw err; }
 };
 
-// ─── Voice helpers ────────────────────────────────────────────────────────────
 const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) { onError("Speech recognition is not supported on this browser. Try Chrome."); return null; }
@@ -162,7 +184,6 @@ const speakText = (text, onStart, onEnd) => {
   window.speechSynthesis.speak(utterance);
 };
 
-// ─── Subject data ─────────────────────────────────────────────────────────────
 const COMPULSORY = {
   "Grade 9": ["Math", "Science", "Social Studies", "English"],
   "Grade 10": ["Math", "Science", "Social Studies", "English"],
@@ -191,14 +212,11 @@ const COMPETITIVE_EXAMS = {
   "Grade 10": COMPETITIVE_EXAMS_ALL,
 };
 
-// ─── 5-screen step labels ─────────────────────────────────────────────────────
 const STEP_LABELS = ["Subjects", "Goal", "Pressure", "Learning", "About You"];
 
-// ─── PWA ─────────────────────────────────────────────────────────────────────
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; });
 
-// ─── Landing Page ─────────────────────────────────────────────────────────────
 function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, authLoading }) {
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -212,7 +230,6 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
   }, []);
 
   const isReturning = user && profile;
-  const isGuest = !user;
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -224,34 +241,26 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center", position: "relative" }}>
       <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`, pointerEvents: "none" }} />
-
-   
-
-      <div style={{ position: "relative", zIndex: 1, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 520, width: "100%", marginTop: isGuest ? 40 : 0 }}>
+      <div style={{ position: "relative", zIndex: 1, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 520, width: "100%", marginTop: !user ? 40 : 0 }}>
         <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
-
         <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 1.8 }}>
           निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision
         </div>
-
         <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
           Nirnayam
         </h1>
         <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
-
         <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
           "Decisions, decisions to make,<br />
           conflicted and lost on the way,<br />
           so Nirnayam's advice you should take,<br />
           so we can be better than yesterday."
         </div>
-
         <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
           Nirnayam is an AI chatbot that helps students make better decisions — whether you're torn between basketball practice and studying, unsure whether to rest or keep grinding, or confused about which subject to tackle first.
         </div>
-
         {!expanded ? (
           <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 32, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
             Why I built this →
@@ -265,13 +274,11 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
             <button onClick={() => setExpanded(false)} style={{ background: "transparent", border: "none", color: "#555", fontFamily: mono, fontSize: 12, cursor: "pointer", textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>Show less ↑</button>
           </div>
         )}
-
         {installable && (
           <button onClick={handleInstall} style={{ background: "transparent", color: "#4ade80", border: "1px solid #4ade80", borderRadius: 5, padding: "10px 24px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 20px", WebkitTapHighlightColor: "transparent" }}>
             ↓ Install Nirnayam as an App
           </button>
         )}
-
         {isReturning ? (
           <div>
             <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
@@ -297,81 +304,39 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
             <button onClick={onGuestStart} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", borderRadius: 5, padding: "12px 36px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 14px", WebkitTapHighlightColor: "transparent" }}>
               Continue without account
             </button>
-            {/* FIX: Bigger, more visible guest warning text */}
             <div style={{ fontFamily: mono, fontSize: 14, color: "#bbb", lineHeight: 1.9, marginTop: 4, padding: "0 8px" }}>
               ⚠ Your profile <span style={{ color: "#facc15" }}>won't be saved</span> as a guest.<br />
               <span style={{ fontSize: 13, color: "#777" }}>Sign in to save your profile and unlock personalisation.</span>
             </div>
           </div>
         )}
-
         <div style={{ marginTop: 20, fontFamily: mono, fontSize: 12, color: "#333" }}>Free · No payment needed</div>
-        {/* FIX: Slightly bigger "Created by" */}
         <div style={{ marginTop: 28, fontFamily: mono, fontSize: 13, color: "#3a3a3a", letterSpacing: "0.05em" }}>Created by Venkat Sai Varanasi</div>
       </div>
     </div>
   );
 }
 
-// ─── Onboarding Timeline ──────────────────────────────────────────────────────
 function OnboardingTimeline({ currentStep, totalSteps, labels }) {
-  // FIX: green circles, line runs through them, bigger
   const CIRCLE = 30;
   const HALF = CIRCLE / 2;
-
   return (
     <div style={{ marginBottom: 36 }}>
       <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        {/* connecting line behind circles */}
-        <div style={{
-          position: "absolute",
-          top: HALF,
-          left: HALF,
-          right: HALF,
-          height: 2,
-          background: "#1a1a1a",
-          zIndex: 0,
-        }} />
-        {/* green progress line */}
-        <div style={{
-          position: "absolute",
-          top: HALF,
-          left: HALF,
-          height: 2,
-          background: "#4ade80",
-          zIndex: 0,
-          width: currentStep === 0 ? "0%" : `${(currentStep / (totalSteps - 1)) * (100 - (HALF / 3))}%`,
-          transition: "width 0.4s ease",
-        }} />
+        <div style={{ position: "absolute", top: HALF, left: HALF, right: HALF, height: 2, background: "#1a1a1a", zIndex: 0 }} />
+        <div style={{ position: "absolute", top: HALF, left: HALF, height: 2, background: "#4ade80", zIndex: 0, width: currentStep === 0 ? "0%" : `${(currentStep / (totalSteps - 1)) * (100 - (HALF / 3))}%`, transition: "width 0.4s ease" }} />
         {labels.map((label, i) => (
           <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", zIndex: 1 }}>
-            <div style={{
-              width: CIRCLE, height: CIRCLE, borderRadius: "50%",
-              background: i < currentStep ? "#4ade80" : i === currentStep ? "#4ade80" : "#0d0d0d",
-              border: `2px solid ${i <= currentStep ? "#4ade80" : "#2a2a2a"}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontFamily: mono, fontSize: 11,
-              color: i <= currentStep ? "#000" : "#444",
-              transition: "all 0.3s ease",
-              flexShrink: 0,
-            }}>
+            <div style={{ width: CIRCLE, height: CIRCLE, borderRadius: "50%", background: i <= currentStep ? "#4ade80" : "#0d0d0d", border: `2px solid ${i <= currentStep ? "#4ade80" : "#2a2a2a"}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono, fontSize: 11, color: i <= currentStep ? "#000" : "#444", transition: "all 0.3s ease", flexShrink: 0 }}>
               {i < currentStep ? "✓" : i + 1}
             </div>
           </div>
         ))}
       </div>
-      {/* labels row below circles */}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         {labels.map((label, i) => (
           <div key={i} style={{ flex: 1, textAlign: "center" }}>
-            <span style={{
-              fontFamily: mono,
-              fontSize: "clamp(8px, 1.5vw, 11px)",
-              color: i === currentStep ? "#4ade80" : i < currentStep ? "#4ade8099" : "#2a2a2a",
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              transition: "color 0.3s ease",
-            }}>{label}</span>
+            <span style={{ fontFamily: mono, fontSize: "clamp(8px, 1.5vw, 11px)", color: i === currentStep ? "#4ade80" : i < currentStep ? "#4ade8099" : "#2a2a2a", letterSpacing: "0.04em", textTransform: "uppercase", transition: "color 0.3s ease" }}>{label}</span>
           </div>
         ))}
       </div>
@@ -379,7 +344,6 @@ function OnboardingTimeline({ currentStep, totalSteps, labels }) {
   );
 }
 
-// ─── Onboarding ───────────────────────────────────────────────────────────────
 function OnboardingPage({ onComplete, initialAnswers, user }) {
   const [step, setStep] = useState(0);
   const [stream, setStream] = useState(initialAnswers?.stream || "");
@@ -399,44 +363,12 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
   const examList = streamKey ? (COMPETITIVE_EXAMS[streamKey] || COMPETITIVE_EXAMS_ALL) : COMPETITIVE_EXAMS_ALL;
   const showCompetitiveExam = answers.academicGoal === "Crack a competitive exam";
 
-  // ── 5 screens ────────────────────────────────────────────────────────────
   const QUESTIONS = [
-    {
-      id: "grade_subjects",
-      label: "Subjects",
-      question: "Your grade and subjects",
-      subtitle: "Select your grade, stream (if 11/12), and any extra subjects",
-      type: "grade_subjects",
-    },
-    {
-      id: "priority_goal",
-      label: "Goal",
-      question: "Priorities and your goal",
-      subtitle: "Rank your subjects, then tell us what you're working towards",
-      type: "priority_goal",
-    },
-    {
-      id: "pressure",
-      label: "Pressure",
-      question: "How do you handle pressure?",
-      subtitle: "Be honest — this calibrates your advice",
-      type: "pressure",
-    },
-    {
-      id: "learningStyle",
-      label: "Learning",
-      question: "How do you learn?",
-      subtitle: "Helps Nirnayam give smarter time estimates",
-      type: "learning",
-    },
-    {
-      id: "about",
-      label: "About You",
-      question: "Tell us a bit more about you",
-      subtitle: "Optional — the more context, the better the advice",
-      type: "about",
-      optional: true,
-    },
+    { id: "grade_subjects", label: "Subjects", question: "Your grade and subjects", subtitle: "Select your grade, stream (if 11/12), and any extra subjects", type: "grade_subjects" },
+    { id: "priority_goal", label: "Goal", question: "Priorities and your goal", subtitle: "Rank your subjects, then tell us what you're working towards", type: "priority_goal" },
+    { id: "pressure", label: "Pressure", question: "How do you handle pressure?", subtitle: "Be honest — this calibrates your advice", type: "pressure" },
+    { id: "learningStyle", label: "Learning", question: "How do you learn?", subtitle: "Helps Nirnayam give smarter time estimates", type: "learning" },
+    { id: "about", label: "About You", question: "Tell us a bit more about you", subtitle: "Optional — the more context, the better the advice", type: "about", optional: true },
   ];
 
   const q = QUESTIONS[step];
@@ -468,7 +400,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
   };
 
   const next = () => {
-    // when leaving grade_subjects, auto-populate subjectPriority
     if (q.id === "grade_subjects") {
       setAnswers(a => ({ ...a, subjectPriority: [...compulsory, ...a.optionalSubjects] }));
     }
@@ -525,14 +456,11 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             Answer these honestly — the more Nirnayam knows you, the better the advice.
           </div>
         )}
-
         <OnboardingTimeline currentStep={step} totalSteps={QUESTIONS.length} labels={STEP_LABELS} />
-
         <div key={step} style={{ animation: "fadeIn 0.3s ease forwards" }}>
           <h2 style={{ fontFamily: syne, fontSize: "clamp(22px, 5vw, 30px)", fontWeight: 700, color: "#fff", margin: "0 0 8px", lineHeight: 1.2 }}>{q.question}</h2>
           {q.subtitle && <p style={{ fontFamily: mono, fontSize: 13, color: "#777", margin: "0 0 20px", lineHeight: 1.7 }}>{q.subtitle}</p>}
 
-          {/* ── Screen 1: Grade + Stream + Subjects ── */}
           {q.id === "grade_subjects" && (
             <div>
               {sectionLabel("Grade")}
@@ -542,7 +470,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
                     style={{ ...btnStyle(answers.grade === opt), flex: "1 1 calc(50% - 5px)" }}>{opt}</button>
                 ))}
               </div>
-
               {(answers.grade === "Grade 11" || answers.grade === "Grade 12") && (
                 <>
                   {sectionLabel("Stream")}
@@ -554,7 +481,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
                   </div>
                 </>
               )}
-
               {compulsory.length > 0 && (
                 <>
                   {sectionLabel("Core subjects — already included")}
@@ -565,7 +491,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
                   </div>
                 </>
               )}
-
               {optionalList.length > 0 && (
                 <>
                   {sectionLabel("Additional subjects — pick any you study")}
@@ -580,7 +505,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             </div>
           )}
 
-          {/* ── Screen 2: Priority + Goal ── */}
           {q.id === "priority_goal" && (
             <div>
               {sectionLabel("Rank your subjects — Drag and Drop OR use ↑↓ arrows")}
@@ -601,7 +525,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
                   ))}
                 </div>
               )}
-
               {sectionLabel("Main academic goal")}
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {["Score well in board exams", "Crack a competitive exam", "Maintain my current grades", "Improve in specific subjects", "No specific goal right now"].map(opt => (
@@ -609,7 +532,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
                     style={btnStyle(answers.academicGoal === opt)}>{opt}</button>
                 ))}
               </div>
-
               {showCompetitiveExam && (
                 <div style={{ animation: "fadeIn 0.3s ease forwards" }}>
                   {sectionLabel("Which exam?")}
@@ -622,30 +544,24 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
                   {answers.competitiveExam === "Other" && (
                     <input type="text" value={answers.customExam || ""} onChange={e => setAnswers(a => ({ ...a, customExam: e.target.value }))}
                       placeholder="Type your exam name..."
-                      style={{ marginTop: 12, width: "100%", background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 5, color: "#ddd", fontFamily: mono, fontSize: 14, padding: "14px 16px", outline: "none", boxSizing: "border-box" }}
-                    />
+                      style={{ marginTop: 12, width: "100%", background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 5, color: "#ddd", fontFamily: mono, fontSize: 14, padding: "14px 16px", outline: "none", boxSizing: "border-box" }} />
                   )}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Screen 3: Pressure ── */}
           {q.id === "pressure" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
               <div>
                 <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 6 }}>How much does stress affect you?</div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 12 }}>
-                  <span>Barely</span><span>Hits hard</span>
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 12 }}><span>Barely</span><span>Hits hard</span></div>
                 <input type="range" min={1} max={10} value={answers.stressLevel} onChange={e => setAnswers(a => ({ ...a, stressLevel: Number(e.target.value) }))} style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }} />
                 <div style={{ textAlign: "center", marginTop: 8, fontFamily: syne, fontSize: 40, fontWeight: 800, color: "#fff" }}>{answers.stressLevel}</div>
               </div>
               <div>
                 <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 6 }}>How's your time management on a normal school day?</div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 12 }}>
-                  <span>Always behind</span><span>Always on track</span>
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 12 }}><span>Always behind</span><span>Always on track</span></div>
                 <input type="range" min={1} max={10} value={answers.timeManagement} onChange={e => setAnswers(a => ({ ...a, timeManagement: Number(e.target.value) }))} style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }} />
                 <div style={{ textAlign: "center", marginTop: 8, fontFamily: syne, fontSize: 40, fontWeight: 800, color: "#fff" }}>{answers.timeManagement}</div>
               </div>
@@ -660,7 +576,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             </div>
           )}
 
-          {/* ── Screen 4: Learning ── */}
           {q.type === "learning" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div>
@@ -681,9 +596,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
               </div>
               <div>
                 <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 6 }}>How easily do you get distracted while studying?</div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 12 }}>
-                  <span>Rarely</span><span>Constantly</span>
-                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 12 }}><span>Rarely</span><span>Constantly</span></div>
                 <input type="range" min={1} max={10} value={answers.learningStyle.distraction} onChange={e => setAnswers(a => ({ ...a, learningStyle: { ...a.learningStyle, distraction: Number(e.target.value) } }))} style={{ width: "100%", accentColor: "#fff", cursor: "pointer" }} />
                 <div style={{ textAlign: "center", marginTop: 8, fontFamily: syne, fontSize: 40, fontWeight: 800, color: "#fff" }}>{answers.learningStyle.distraction}</div>
               </div>
@@ -698,7 +611,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             </div>
           )}
 
-          {/* ── Screen 5: About You ── */}
           {q.id === "about" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div>
@@ -743,7 +655,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
   );
 }
 
-// ─── Voice Input Button ───────────────────────────────────────────────────────
 function VoiceInputButton({ onTranscript, onError }) {
   const [listening, setListening] = useState(false);
   const [interimText, setInterimText] = useState("");
@@ -764,28 +675,15 @@ function VoiceInputButton({ onTranscript, onError }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <button onClick={toggle} title={listening ? "Tap to stop" : "Tap to speak"} style={{
-        background: listening ? "#f87171" : "transparent",
-        border: `1px solid ${listening ? "#f87171" : "#333"}`,
-        borderRadius: 5, padding: "10px 14px",
-        fontFamily: mono, fontSize: 13,
-        color: listening ? "#000" : "#666",
-        cursor: "pointer", transition: "all 0.2s",
-        WebkitTapHighlightColor: "transparent",
-        display: "flex", alignItems: "center", gap: 6,
-        animation: listening ? "pulse 1s ease-in-out infinite" : "none",
-      }}>
+      <button onClick={toggle} title={listening ? "Tap to stop" : "Tap to speak"} style={{ background: listening ? "#f87171" : "transparent", border: `1px solid ${listening ? "#f87171" : "#333"}`, borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: listening ? "#000" : "#666", cursor: "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6, animation: listening ? "pulse 1s ease-in-out infinite" : "none" }}>
         <span style={{ fontSize: 16 }}>{listening ? "⏹" : "🎙"}</span>
         <span>{listening ? "listening..." : "speak"}</span>
       </button>
-      {interimText && (
-        <div style={{ fontFamily: mono, fontSize: 11, color: "#555", fontStyle: "italic", paddingLeft: 2 }}>"{interimText}"</div>
-      )}
+      {interimText && <div style={{ fontFamily: mono, fontSize: 11, color: "#555", fontStyle: "italic", paddingLeft: 2 }}>"{interimText}"</div>}
     </div>
   );
 }
 
-// ─── Voice Output Button ──────────────────────────────────────────────────────
 function VoiceOutputButton({ result }) {
   const [speaking, setSpeaking] = useState(false);
   const toggle = () => {
@@ -796,23 +694,13 @@ function VoiceOutputButton({ result }) {
   };
   if (!window.speechSynthesis) return null;
   return (
-    <button onClick={toggle} style={{
-      background: speaking ? "#4ade80" : "transparent",
-      border: `1px solid ${speaking ? "#4ade80" : "#2a2a2a"}`,
-      borderRadius: 4, padding: "6px 12px",
-      fontFamily: mono, fontSize: 12,
-      color: speaking ? "#000" : "#555",
-      cursor: "pointer", transition: "all 0.2s",
-      WebkitTapHighlightColor: "transparent",
-      display: "flex", alignItems: "center", gap: 6,
-    }}>
+    <button onClick={toggle} style={{ background: speaking ? "#4ade80" : "transparent", border: `1px solid ${speaking ? "#4ade80" : "#2a2a2a"}`, borderRadius: 4, padding: "6px 12px", fontFamily: mono, fontSize: 12, color: speaking ? "#000" : "#555", cursor: "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6 }}>
       <span>{speaking ? "⏹" : "🔊"}</span>
       <span>{speaking ? "stop" : "listen to advice"}</span>
     </button>
   );
 }
 
-// ─── Star Rating ──────────────────────────────────────────────────────────────
 function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
@@ -863,7 +751,6 @@ function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
   );
 }
 
-// ─── Result Skeleton ──────────────────────────────────────────────────────────
 function ResultSkeleton() {
   const shimmer = { background: "linear-gradient(90deg,#111 25%,#1a1a1a 50%,#111 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite", borderRadius: 4 };
   return (
@@ -893,7 +780,6 @@ function ResultSkeleton() {
   );
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
 function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [situation, setSituation] = useState("");
   const [result, setResult] = useState(null);
@@ -934,10 +820,9 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   );
 
   const urgencyInfo = result ? getUrgencyLabel(result.confidence) : null;
-  
+
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto" }}>
-
       {showEditConfirm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 10, padding: 28, maxWidth: 380, width: "100%", textAlign: "center" }}>
@@ -951,7 +836,6 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
         </div>
       )}
 
-      {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <button onClick={onGoToLanding} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0, WebkitTapHighlightColor: "transparent" }}>
@@ -963,23 +847,15 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
             {personData && personData.total > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· personalised ({personData.total})</span>}
           </div>
         </div>
-
-        {/* FIX: History LEFT, Settings RIGHT — swapped */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          {/* History — left */}
           <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
             {showHistory ? "← back" : `history (${history.length})`}
           </button>
-
-          {/* Settings — right with arrow hint */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
             <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 5 }}>
               ⚙ settings
             </button>
-            {/* FIX: Bigger, more visible arrow hint */}
-            <div style={{ fontFamily: mono, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 4 }}>
-              ↑ change profile here
-            </div>
+            <div style={{ fontFamily: mono, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 4 }}>↑ change profile here</div>
           </div>
         </div>
       </div>
@@ -994,8 +870,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
             </div>
             <textarea ref={textareaRef} value={situation} onChange={e => setSituation(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) analyse(); }}
               placeholder={"Describe your full situation. The more detail, the better the advice.\n\ne.g. 'I have a Math exam in 2 days. Revision is mostly done but I'm stressed. Basketball finals are tomorrow and coach wants me at practice today. What should I do?'"}
-              style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 140, outline: "none", boxSizing: "border-box" }}
-            />
+              style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 140, outline: "none", boxSizing: "border-box" }} />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
               <VoiceInputButton onTranscript={(t) => setSituation(prev => prev ? prev + " " + t : t)} onError={(e) => setVoiceError(e)} />
               <button onClick={analyse} disabled={loading || !situation.trim()} style={{ background: loading || !situation.trim() ? "#1a1a1a" : "#fff", color: loading || !situation.trim() ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || !situation.trim() ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
@@ -1003,7 +878,6 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
               </button>
             </div>
           </div>
-
           {voiceError && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "10px 14px", fontFamily: mono, fontSize: 12, color: "#f87171", marginBottom: 10 }}>{voiceError}</div>}
           {loading && <ResultSkeleton />}
           {error && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: mono, fontSize: 13, color: "#f87171" }}>{error}</div>}
@@ -1019,12 +893,10 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   );
 }
 
-// ─── Settings Page ────────────────────────────────────────────────────────────
 function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onBack }) {
   return (
     <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
       <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 32 }}>Settings</div>
-
       <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
         <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Account</div>
         {user ? (
@@ -1042,7 +914,6 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
           <div style={{ fontFamily: mono, fontSize: 13, color: "#666" }}>You're using Nirnayam as a guest. Sign in to save your profile and enable personalisation.</div>
         )}
       </div>
-
       {user && personData && personData.total > 0 && (
         <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Personalisation — {personData.total} ratings</div>
@@ -1064,7 +935,6 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
           </div>
         </div>
       )}
-
       <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
         <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Your Profile</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1083,7 +953,6 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
           ))}
         </div>
       </div>
-
       <button onClick={onEditProfile} style={{ width: "100%", background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "14px", fontFamily: mono, fontSize: 14, cursor: "pointer", WebkitTapHighlightColor: "transparent", marginBottom: 8 }}>
         Edit profile
       </button>
@@ -1093,7 +962,6 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
   );
 }
 
-// ─── Result View ──────────────────────────────────────────────────────────────
 function ResultView({ result, urgencyInfo }) {
   return (
     <div style={{ animation: "fadeIn 0.4s ease forwards" }}>
@@ -1110,24 +978,24 @@ function ResultView({ result, urgencyInfo }) {
       </div>
 
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
-  <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
-  <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 14 }}>
-    {(result.splits || []).map((s, i) => (
-      <div key={i} style={{ width: `${s.percent}%`, background: SPLIT_COLORS[i % SPLIT_COLORS.length], transition: "width 1s ease" }} />
-    ))}
-  </div>
-  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    {(result.splits || []).map((s, i) => (
-      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: SPLIT_COLORS[i % SPLIT_COLORS.length], flexShrink: 0 }} />
-          <span style={{ fontFamily: mono, fontSize: 13, color: i === 0 ? "#ccc" : "#666" }}>{s.label}</span>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 12 }}>How to split your time</div>
+        <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 14 }}>
+          {(result.splits || []).map((s, i) => (
+            <div key={i} style={{ width: `${s.percent}%`, background: SPLIT_COLORS[i % SPLIT_COLORS.length], transition: "width 1s ease" }} />
+          ))}
         </div>
-        <span style={{ fontFamily: mono, fontSize: 13, color: i === 0 ? "#ccc" : "#555" }}>{s.percent}%</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {(result.splits || []).map((s, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: SPLIT_COLORS[i % SPLIT_COLORS.length], flexShrink: 0 }} />
+                <span style={{ fontFamily: mono, fontSize: 13, color: i === 0 ? "#ccc" : "#666" }}>{s.label}</span>
+              </div>
+              <span style={{ fontFamily: mono, fontSize: 13, color: i === 0 ? "#ccc" : "#555" }}>{s.percent}%</span>
+            </div>
+          ))}
+        </div>
       </div>
-    ))}
-  </div>
-</div>
 
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Key insight</div>
@@ -1156,7 +1024,6 @@ function ResultView({ result, urgencyInfo }) {
   );
 }
 
-// ─── History View ─────────────────────────────────────────────────────────────
 function HistoryView({ history, onSelect }) {
   if (history.length === 0) return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: mono, fontSize: 14, color: "#2a2a2a" }}>No decisions yet this session.</div>;
   return (
@@ -1178,7 +1045,6 @@ function HistoryView({ history, onSelect }) {
   );
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
 export default function Nirnayam() {
   const [screen, setScreen] = useState("loading");
   const [profile, setProfile] = useState(null);
