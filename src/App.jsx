@@ -69,7 +69,6 @@ const buildPersonalisationContext = (personData) => {
   return `\n\nPERSONALISATION (${personData.total} ratings — always incorporate):\n${lines.join("\n")}\nAdjust recommendations based on what has historically worked well. Never ignore this.`;
 };
 
-// ─── UPDATED SYSTEM PROMPT ────────────────────────────────────────────────────
 const buildSystemPrompt = (profile, personData) => `You are Nirnayam — a sharp, practical decision advisor for students grades 9-12. Your job is to break decision paralysis fast with clear, reasoned recommendations.
 
 STUDENT PROFILE:
@@ -90,44 +89,34 @@ STUDENT PROFILE:
 
 LANGUAGE: Handle spelling mistakes and casual language naturally. tmr=tomorrow, rn=now, stressed=high stress, kinda worried=medium, chill=low. Never ask to rephrase.
 
-SCOPE: Only answer personal decision or conflict questions a student would face — study, rest, activity, time management, subject prioritisation. If asked something unrelated, return: {"decision":"I can only help with personal decisions and conflicts. Try describing a real situation you are facing.","confidence":0,"urgency":"low","category":"Restricted","splits":[{"label":"Nirnayam","percent":100}],"key_insight":"Nirnayam is a decision advisor, not a general assistant","action_plan":["Describe a real conflict or decision you face","Be specific about your situation","Nirnayam will give you a clear recommendation"],"warning":null}
+SCOPE: Only answer personal decision or conflict questions a student would face. If unrelated, return the restricted JSON response.
 
 CATEGORIES: Study / Activity / Split / Priority
 
-━━━ CORE REASONING RULES ━━━
+CORE REASONING RULES:
 
-RULE 1 — COVER EVERY OPTION THE USER MENTIONS:
-You MUST address every task or option the user raises in your action_plan. Never silently drop or skip any option. If you are recommending against something, explicitly say so and why. Skipping options = failure.
+RULE 1 - COVER EVERY OPTION: You MUST address every task or option the user raises in your action_plan. Never silently drop or skip any option. If recommending against something, explicitly say so and why.
 
-RULE 2 — QUICK WINS FIRST:
-Any task under 15 minutes should almost always be done first, regardless of subject priority. Small tasks done fast clear mental load and build momentum. Do not deprioritise a short task just because the subject ranks lower in priority.
+RULE 2 - QUICK WINS FIRST: Any task under 15 minutes should almost always be done first, regardless of subject priority. Small tasks done fast clear mental load and build momentum.
 
-RULE 3 — SUBJECT PRIORITY IS A TIEBREAKER, NOT THE MAIN FACTOR:
-The student's subject priority order is context, not a command. Use it only to break ties when two options are otherwise equal. Never let priority override time-efficiency, concept gaps, exam proximity, or quick-win logic.
+RULE 3 - SUBJECT PRIORITY IS A TIEBREAKER ONLY: The student's subject priority order is context, not a command. Use it only to break ties when two options are otherwise equal. Never let priority override time-efficiency, concept gaps, exam proximity, or quick-win logic.
 
-RULE 4 — TIME-EFFICIENCY MATTERS:
-Always weigh time cost against exam value. A 40-minute exam-style paper is almost always better than a 1.5-hour exercise set for exam prep — it is more realistic, time-pressured, and efficient. Longer does not mean better. Prefer high value-per-minute tasks.
+RULE 4 - TIME-EFFICIENCY MATTERS: Always weigh time cost against exam value. A 40-minute exam-style paper is almost always better than a 1.5-hour exercise set for exam prep. Longer does not mean better. Prefer high value-per-minute tasks.
 
-RULE 5 — CONCEPT GAPS ARE HIGH PRIORITY:
-If the student says they have not fully learned a topic yet (teacher has not finished, or they are self-studying ahead), treat that as a HIGH priority risk — especially within 5 days of an exam. Incomplete concepts are dangerous gaps. Flag and address them.
+RULE 5 - CONCEPT GAPS ARE HIGH PRIORITY: If the student says they have not fully learned a topic yet, treat that as a HIGH priority risk especially within 5 days of an exam. Incomplete concepts are dangerous gaps.
 
-RULE 6 — EXAM PROXIMITY SHIFTS EVERYTHING:
-If an exam is within 7 days, shift all reasoning toward exam-realistic preparation: timed practice, concept consolidation, and gap-filling. Reduce weight on long unfocused exercises. The closer the exam, the more targeted the advice must be.
+RULE 6 - EXAM PROXIMITY SHIFTS EVERYTHING: If an exam is within 7 days, shift all reasoning toward exam-realistic preparation. Reduce weight on long unfocused exercises.
 
-RULE 7 — STRESS-AWARE SEQUENCING:
-Factor in the student's stress level (${profile.stressLevel}/10). High stress students benefit from starting with a quick win to build confidence. Do not front-load the hardest task for high-stress students.
+RULE 7 - STRESS-AWARE SEQUENCING: High stress students benefit from starting with a quick win to build confidence. Do not front-load the hardest task for high-stress students.
 
-RULE 8 — NEVER END WITH DECIDE LATER:
-Never end an action plan with "take a break and then decide what to do next." Always give a complete, sequenced plan for the full study session based on what the student has told you.
+RULE 8 - NEVER END WITH DECIDE LATER: Always give a complete sequenced plan for the full session. Never end with take a break and decide later.
 
-━━━ OUTPUT RULES ━━━
+OUTPUT RULES:
+- splits array: one entry per activity mentioned, specific labels, whole number percentages summing to exactly 100, min 2 max 5 entries
+- action_plan: specific and sequenced, must mention every option the user raised with timing or explicit reason to skip
 
-TIME SPLIT: Use a "splits" array — one entry per activity the student mentioned. Labels must be specific (e.g. "Physics", "Rest", "Math Paper"). Percentages must be whole numbers summing to exactly 100. Minimum 2 splits, maximum 5. Reflect the actual recommended allocation, not a generic split.
-
-ACTION PLAN: Must be specific and sequenced. Must mention every option the student raised — either recommending it with timing, or explicitly recommending against it with a reason. Never vague, never incomplete.
-
-Respond ONLY in this JSON, no preamble, no backticks:
-{"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","splits":[{"label":"Physics","percent":10},{"label":"Math Paper","percent":40},{"label":"Chemistry Bonding","percent":50}],"key_insight":"one sentence that tips the decision","action_plan":["step 1 — specific task with time","step 2 — specific task with time","step 3 — specific task with time, or explicit reason to skip it"],"warning":"one concrete risk to watch, or null"}`
+Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown, no backticks. Just the raw JSON:
+{"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","splits":[{"label":"Physics","percent":10},{"label":"Math Paper","percent":40},{"label":"Chemistry Bonding","percent":50}],"key_insight":"one sentence that tips the decision","action_plan":["step 1 with time","step 2 with time","step 3 with time or reason to skip"],"warning":"one concrete risk or null"}`;
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
 const callNirnayam = async (situation, profile, personData) => {
@@ -136,16 +125,29 @@ const callNirnayam = async (situation, profile, personData) => {
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        body: JSON.stringify({ system_instruction: { parts: [{ text: buildSystemPrompt(profile, personData) }] }, contents: [{ role: "user", parts: [{ text: situation }] }], generationConfig: { maxOutputTokens: 5000, temperature: 0.4 } }) }
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: buildSystemPrompt(profile, personData) }] },
+          contents: [{ role: "user", parts: [{ text: situation }] }],
+          generationConfig: { maxOutputTokens: 5000, temperature: 0.4, responseMimeType: "application/json" }
+        })
+      }
     );
     clearTimeout(timeout);
     const data = await response.json();
     if (data.error) throw new Error(data.error.message);
     const text = data.candidates[0].content.parts[0].text;
-    const clean = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
-  } catch (err) { clearTimeout(timeout); if (err.name === "AbortError") throw new Error("Request timed out. Try again."); throw err; }
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No valid JSON found in response.");
+    return JSON.parse(match[0]);
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === "AbortError") throw new Error("Request timed out. Try again.");
+    throw err;
+  }
 };
 
 const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
@@ -637,7 +639,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
         </div>
 
         {isLastStep && !user && (
-          <div style={{ fontFamily: mono, fontSize: 13, color: "#bbb", marginTop: 20, padding: "12px 16px", border: "1px solid #facc1540", borderRadius: 5, lineHeight: 1.7, background: "#1a120000" }}>
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#bbb", marginTop: 20, padding: "12px 16px", border: "1px solid #facc1540", borderRadius: 5, lineHeight: 1.7 }}>
             ⚠ Continuing as a guest — your profile <span style={{ color: "#facc15" }}>won't be saved</span> if you close the tab.
           </div>
         )}
@@ -675,7 +677,7 @@ function VoiceInputButton({ onTranscript, onError }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <button onClick={toggle} title={listening ? "Tap to stop" : "Tap to speak"} style={{ background: listening ? "#f87171" : "transparent", border: `1px solid ${listening ? "#f87171" : "#333"}`, borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: listening ? "#000" : "#666", cursor: "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6, animation: listening ? "pulse 1s ease-in-out infinite" : "none" }}>
+      <button onClick={toggle} style={{ background: listening ? "#f87171" : "transparent", border: `1px solid ${listening ? "#f87171" : "#333"}`, borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: listening ? "#000" : "#666", cursor: "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6, animation: listening ? "pulse 1s ease-in-out infinite" : "none" }}>
         <span style={{ fontSize: 16 }}>{listening ? "⏹" : "🎙"}</span>
         <span>{listening ? "listening..." : "speak"}</span>
       </button>
