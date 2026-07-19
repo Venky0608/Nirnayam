@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
+import StudyChatbot from "./components/StudyChatbot/StudyChatbot";
 
 const mono = "'DM Mono', monospace";
 const syne = "'Syne', sans-serif";
