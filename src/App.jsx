@@ -793,6 +793,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const [error, setError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showChatbot, setShowChatbot] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
   const [history, setHistory] = useState([]);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
@@ -818,7 +819,22 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
       setError(e.message || "Something went wrong. Check your connection and try again.");
     } finally { setLoading(false); analysingRef.current = false; }
   };
-
+  if (showChatbot) return (
+  <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto", display: "flex", flexDirection: "column" }}>
+    <button onClick={() => setShowChatbot(false)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", marginBottom: 16, alignSelf: "flex-start" }}>
+      ← back
+    </button>
+    <div style={{ flex: 1, minHeight: 0 }}>
+      <StudyChatbot profile={{
+        grade: profile.grade,
+        stream: profile.stream || "",
+        examTarget: profile.competitiveExam === "Other"
+          ? (profile.customExam || "competitive exam")
+          : (profile.competitiveExam || profile.academicGoal || "board exams"),
+      }} />
+    </div>
+  </div>
+);
   if (showSettings) return (
     <SettingsPage profile={profile} user={user} personData={personData}
       onEditProfile={() => { setShowSettings(false); setShowEditConfirm(true); }}
@@ -857,6 +873,9 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
           <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
             {showHistory ? "← back" : `history (${history.length})`}
           </button>
+          <button onClick={() => setShowChatbot(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+  chat
+</button>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
             <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 5 }}>
               ⚙ settings
