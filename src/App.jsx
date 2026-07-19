@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
-import StudyChatbot from "./components/StudyChatbot/StudyChatbot";
+import { streamChatResponse } from "./components/StudyChatbot/geminiChatService";
 
 const mono = "'DM Mono', monospace";
 const syne = "'Syne', sans-serif";
@@ -151,6 +151,47 @@ const callNirnayam = async (situation, profile, personData) => {
     clearTimeout(timeout);
     if (err.name === "AbortError") throw new Error("Request timed out. Try again.");
     throw err;
+  }
+};
+
+// Uses the CHAT key (not the decision-engine key) — classification runs on
+// every message, so keeping it off the decide key avoids any contention
+// with the core `decide` feature under load.
+const CHAT_KEY = import.meta.env.VITE_GEMINI_CHAT_KEY;
+
+const classifyIntent = async (message) => {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CHAT_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [{
+              text: `Classify this message from a student using a study app. Respond with EXACTLY one word, nothing else.
+
+- "decide" — student is conflicted between options, needs a decision, priority call, or time-split plan (e.g. "should I study physics or finish my chem hw", "what should I focus on today")
+- "study" — student wants something explained, taught, or wants help understanding a concept (e.g. "explain projectile motion", "why does this formula work")
+- "both" — message clearly contains BOTH a conflict/decision AND a request to understand something
+
+Message: "${message}"
+
+Answer (one word only):`
+            }]
+          }],
+          generationConfig: { maxOutputTokens: 10, temperature: 0 }
+        })
+      }
+    );
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase() || "";
+    if (text.includes("both")) return "both";
+    if (text.includes("study")) return "study";
+    return "decide"; // default — decide is the app's core function, safest fallback
+  } catch {
+    return "decide"; // network hiccup — don't block the user, just fall back
   }
 };
 
@@ -787,54 +828,71 @@ function ResultSkeleton() {
 }
 
 function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
-  const [situation, setSituation] = useState("");
-  const [result, setResult] = useState(null);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, result?, situation? }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showChatbot, setShowChatbot] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
   const [history, setHistory] = useState([]);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
-  const analysingRef = useRef(false);
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
     }
-  }, [situation]);
+  }, [input]);
 
-  const analyse = async () => {
-    if (!situation.trim() || analysingRef.current) return;
-    analysingRef.current = true;
-    setLoading(true); setError(null); setResult(null);
+  const handleSend = async () => {
+    const trimmed = input.trim();
+    if (!trimmed || loading) return;
+
+    setError(null);
+    setMessages(prev => [...prev, { role: "user", text: trimmed }]);
+    setInput("");
+    setLoading(true);
+
     try {
-      const res = await callNirnayam(situation, profile, personData);
-      setResult(res);
-      setHistory(prev => [{ situation, result: res, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
+      const intent = await classifyIntent(trimmed);
+
+      if (intent === "decide" || intent === "both") {
+        const res = await callNirnayam(trimmed, profile, personData);
+        setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation: trimmed }]);
+        setHistory(prev => [{ situation: trimmed, result: res, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
+      }
+
+      if (intent === "study" || intent === "both") {
+        setMessages(prev => [...prev, { role: "assistant", kind: "chat", text: "" }]);
+        let accumulated = "";
+        await streamChatResponse(
+          [{ role: "user", text: trimmed }],
+          {
+            grade: profile.grade,
+            stream: profile.stream || "",
+            examTarget: profile.competitiveExam === "Other"
+              ? (profile.customExam || "competitive exam")
+              : (profile.competitiveExam || profile.academicGoal || "board exams"),
+          },
+          (chunk) => {
+            accumulated += chunk;
+            setMessages(prev => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { role: "assistant", kind: "chat", text: accumulated };
+              return updated;
+            });
+          }
+        );
+      }
     } catch (e) {
       setError(e.message || "Something went wrong. Check your connection and try again.");
-    } finally { setLoading(false); analysingRef.current = false; }
+    } finally {
+      setLoading(false);
+    }
   };
-  if (showChatbot) return (
-  <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto", display: "flex", flexDirection: "column" }}>
-    <button onClick={() => setShowChatbot(false)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", marginBottom: 16, alignSelf: "flex-start" }}>
-      ← back
-    </button>
-    <div style={{ flex: 1, minHeight: 0 }}>
-      <StudyChatbot profile={{
-        grade: profile.grade,
-        stream: profile.stream || "",
-        examTarget: profile.competitiveExam === "Other"
-          ? (profile.customExam || "competitive exam")
-          : (profile.competitiveExam || profile.academicGoal || "board exams"),
-      }} />
-    </div>
-  </div>
-);
+
   if (showSettings) return (
     <SettingsPage profile={profile} user={user} personData={personData}
       onEditProfile={() => { setShowSettings(false); setShowEditConfirm(true); }}
