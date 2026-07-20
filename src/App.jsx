@@ -187,6 +187,7 @@ Answer (one word only):`
     );
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase() || "";
+    console.log("Gemini replied:", text);
     if (text.includes("both")) return "both";
     if (text.includes("study")) return "study";
     return "decide"; // default — decide is the app's core function, safest fallback
