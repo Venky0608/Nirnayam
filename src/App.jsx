@@ -166,34 +166,103 @@ const classifyIntent = async (message) => {
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${CHAT_KEY}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [{
-              text: `Classify this message from a student using a study app. Respond with EXACTLY one word, nothing else.
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 30,
+            responseMimeType: "application/json",
+          },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `You are an intent router for an AI student assistant.
 
-- "decide" — student is conflicted between options, needs a decision, priority call, or time-split plan (e.g. "should I study physics or finish my chem hw", "what should I focus on today")
-- "study" — student wants something explained, taught, or wants help understanding a concept (e.g. "explain projectile motion", "why does this formula work")
-- "both" — message clearly contains BOTH a conflict/decision AND a request to understand something
+Return ONLY valid JSON.
 
-Message: "${message}"
+{
+  "route":"study"
+}
 
-Answer (one word only):`
-            }]
-          }],
-          generationConfig: { maxOutputTokens: 10, temperature: 0 }
+Allowed routes:
+- study
+- decision
+- both
+
+Definitions:
+
+study:
+The student wants an explanation, concept, derivation, formula, learning help, homework explanation or academic teaching.
+
+decision:
+The student wants advice, prioritization, choosing between options, planning, scheduling, or conflict resolution.
+
+both:
+The message clearly asks for BOTH learning AND decision making.
+
+Examples:
+
+User:
+Explain photosynthesis.
+
+Output:
+{"route":"study"}
+
+User:
+Should I study physics or chemistry today?
+
+Output:
+{"route":"decision"}
+
+User:
+Should I study electrostatics first? Also explain Coulomb's law.
+
+Output:
+{"route":"both"}
+
+Now classify this:
+
+${message}`
+                }
+              ]
+            }
+          ]
         })
       }
     );
+
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase() || "";
-    console.log("Gemini replied:", JSON.stringify(text));
-    if (text.includes("both")) return "both";
-    if (text.includes("study")) return "study";
-    return "decide"; // default — decide is the app's core function, safest fallback
-  } catch {
-    return "decide"; // network hiccup — don't block the user, just fall back
+
+    const raw =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+
+    console.log("Router raw:", raw);
+
+    const cleaned = raw
+  .replace(/```json/g, "")
+  .replace(/```/g, "")
+  .trim();
+
+const parsed = JSON.parse(cleaned);
+
+    console.log("Router:", parsed.route);
+
+    if (
+      parsed.route === "study" ||
+      parsed.route === "decision" ||
+      parsed.route === "both"
+    ) {
+      return parsed.route;
+    }
+
+    return "decision";
+  } catch (err) {
+    console.error("Router Error:", err);
+    return "decision";
   }
 };
 
@@ -861,7 +930,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
       const intent = await classifyIntent(trimmed);
       console.log("Intent:", intent);
 
-      if (intent === "decide" || intent === "both") {
+      if (intent === "decision" || intent === "both") {
         const res = await callNirnayam(trimmed, profile, personData);
         setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation: trimmed }]);
         setHistory(prev => [{ situation: trimmed, result: res, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
