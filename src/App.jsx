@@ -857,6 +857,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 
     try {
       const intent = await classifyIntent(trimmed);
+      console.log("Intent:", intent);
 
       if (intent === "decide" || intent === "both") {
         const res = await callNirnayam(trimmed, profile, personData);
