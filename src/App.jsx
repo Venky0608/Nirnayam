@@ -931,9 +931,6 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
           <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
             {showHistory ? "← back" : `history (${history.length})`}
           </button>
-          <button onClick={() => setShowChatbot(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
-  chat
-</button>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
             <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 5 }}>
               ⚙ settings
@@ -944,32 +941,49 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
       </div>
 
       {showHistory ? (
-        <HistoryView history={history} onSelect={(h) => { setSituation(h.situation); setResult(h.result); setShowHistory(false); }} />
+        <HistoryView history={history} onSelect={(h) => { setShowHistory(false); }} />
       ) : (
         <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
+            {messages.map((m, i) => {
+              if (m.role === "user") {
+                return (
+                  <div key={i} style={{ alignSelf: "flex-end", maxWidth: "80%", background: "#fff", color: "#000", borderRadius: 8, padding: "10px 14px", fontFamily: mono, fontSize: 14, lineHeight: 1.6 }}>
+                    {m.text}
+                  </div>
+                );
+              }
+              if (m.kind === "decision") {
+                const uInfo = getUrgencyLabel(m.result.confidence);
+                return (
+                  <div key={i} style={{ alignSelf: "stretch" }}>
+                    <ResultView result={m.result} urgencyInfo={uInfo} />
+                    <StarRating result={m.result} situation={m.situation} user={user} onGoogleSignIn={onGoogleSignIn} onRated={onPersonDataRefresh} />
+                  </div>
+                );
+              }
+              return (
+                <div key={i} style={{ alignSelf: "flex-start", maxWidth: "80%", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "10px 14px", fontFamily: mono, fontSize: 14, lineHeight: 1.7, color: "#ccc", whiteSpace: "pre-wrap" }}>
+                  {m.text || "···"}
+                </div>
+              );
+            })}
+          </div>
+
           <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, marginBottom: 16, overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid #111", fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.15em", textTransform: "uppercase" }}>
-              What are you conflicted about?
-            </div>
-            <textarea ref={textareaRef} value={situation} onChange={e => setSituation(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) analyse(); }}
-              placeholder={"Describe your full situation. The more detail, the better the advice.\n\ne.g. 'I have a Math exam in 2 days. Revision is mostly done but I'm stressed. Basketball finals are tomorrow and coach wants me at practice today. What should I do?'"}
-              style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 140, outline: "none", boxSizing: "border-box" }} />
+            <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSend(); }}
+              placeholder={"Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'"}
+              style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 100, outline: "none", boxSizing: "border-box" }} />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
-              <VoiceInputButton onTranscript={(t) => setSituation(prev => prev ? prev + " " + t : t)} onError={(e) => setVoiceError(e)} />
-              <button onClick={analyse} disabled={loading || !situation.trim()} style={{ background: loading || !situation.trim() ? "#1a1a1a" : "#fff", color: loading || !situation.trim() ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || !situation.trim() ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
-                {loading ? "thinking..." : "decide →"}
+              <VoiceInputButton onTranscript={(t) => setInput(prev => prev ? prev + " " + t : t)} onError={(e) => setVoiceError(e)} />
+              <button onClick={handleSend} disabled={loading || !input.trim()} style={{ background: loading || !input.trim() ? "#1a1a1a" : "#fff", color: loading || !input.trim() ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || !input.trim() ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
+                {loading ? "thinking..." : "send →"}
               </button>
             </div>
           </div>
           {voiceError && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "10px 14px", fontFamily: mono, fontSize: 12, color: "#f87171", marginBottom: 10 }}>{voiceError}</div>}
-          {loading && <ResultSkeleton />}
           {error && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: mono, fontSize: 13, color: "#f87171" }}>{error}</div>}
-          {result && !loading && (
-            <>
-              <ResultView result={result} urgencyInfo={urgencyInfo} />
-              <StarRating result={result} situation={situation} user={user} onGoogleSignIn={onGoogleSignIn} onRated={onPersonDataRefresh} />
-            </>
-          )}
+          {loading && <ResultSkeleton />}
         </>
       )}
     </div>
