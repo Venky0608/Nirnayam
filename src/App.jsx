@@ -142,6 +142,7 @@ const callNirnayam = async (situation, profile, personData) => {
     );
     clearTimeout(timeout);
     const data = await response.json();
+    console.log(data);
     if (data.error) throw new Error(data.error.message);
     const text = data.candidates[0].content.parts[0].text;
     const match = text.match(/\{[\s\S]*\}/);
