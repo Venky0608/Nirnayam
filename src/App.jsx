@@ -899,7 +899,6 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
       onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />
   );
 
-  const urgencyInfo = result ? getUrgencyLabel(result.confidence) : null;
 
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto" }}>
