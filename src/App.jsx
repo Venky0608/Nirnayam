@@ -142,6 +142,8 @@ const callNirnayam = async (situation, profile, personData) => {
     );
     clearTimeout(timeout);
     const data = await response.json();
+    console.log("ROUTER FULL:", data);
+    console.log("TEXT:", data.candidates?.[0]?.content?.parts?.[0]?.text);
     console.log("FULL ROUTER RESPONSE:", data);
     console.log(data);
     if (data.error) throw new Error(data.error.message);
