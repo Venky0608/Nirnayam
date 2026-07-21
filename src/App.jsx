@@ -125,7 +125,7 @@ Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown,
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
 const callNirnayam = async (situation, profile, personData) => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 120000);
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`,
