@@ -248,7 +248,11 @@ ${message}`
   .replace(/```/g, "")
   .trim();
 
-const parsed = JSON.parse(cleaned);
+const match = cleaned.match(/\{[\s\S]*\}/);
+
+if (!match) throw new Error("No JSON");
+
+const parsed = JSON.parse(match[0]);
 
     console.log("Router:", parsed.route);
 
