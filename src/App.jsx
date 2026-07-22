@@ -128,7 +128,7 @@ const callNirnayam = async (situation, profile, personData) => {
   const timeout = setTimeout(() => controller.abort(), 120000);
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,7 +166,7 @@ const CHAT_KEY = import.meta.env.VITE_GEMINI_CHAT_KEY;
 const classifyIntent = async (message) => {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${CHAT_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${CHAT_KEY}`,
       {
         method: "POST",
         headers: {
