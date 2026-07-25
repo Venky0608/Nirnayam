@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import "./components/StudyChatbot/StudyChatbot.css";
 const mono = "'DM Mono', monospace";
 const syne = "'Syne', sans-serif";
 const urgencyColor = (u) => ({ low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171" }[u] || "#888");
@@ -1062,6 +1063,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                   }}
                 >
                   <ReactMarkdown
+                    className="chat-markdown"
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}
                   >
