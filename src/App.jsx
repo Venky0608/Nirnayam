@@ -1055,7 +1055,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                     background: "#0d0d0d",
                     border: "1px solid #1e1e1e",
                     borderRadius: 8,
-                    padding: "10px 14px",
+                    padding: "20px 28px",
                     fontFamily: mono,
                     fontSize: 14,
                     lineHeight: 1.7,
