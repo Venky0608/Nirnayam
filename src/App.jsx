@@ -985,7 +985,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 
 
   return (
-    <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 660, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 950, margin: "0 auto" }}>
       {showEditConfirm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 10, padding: 28, maxWidth: 380, width: "100%", textAlign: "center" }}>
