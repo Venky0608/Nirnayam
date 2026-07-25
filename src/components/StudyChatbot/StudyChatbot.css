@@ -1,69 +1,74 @@
-/* =========================
-   Chat Markdown Styling
-========================= */
+/* ==========================================
+   NIRNAYAM STUDY CHATBOT MARKDOWN STYLING
+========================================== */
 
 .chat-markdown {
   font-family: "Inter", sans-serif;
   color: #e5e5e5;
-  line-height: 2.0;
   font-size: 15px;
+  line-height: 1.9;
   overflow-wrap: break-word;
 }
 
-/* Headings */
+/* =========================
+   HEADINGS
+========================= */
 
 .chat-markdown h1,
 .chat-markdown h2,
 .chat-markdown h3,
 .chat-markdown h4,
-.chat-markdown h5 {
-  color: white;
-  margin-top: 26px;
-  margin-bottom: 14px;
+.chat-markdown h5,
+.chat-markdown h6 {
+  color: #ffffff;
   font-weight: 700;
+  margin: 1.4rem 0 0.8rem;
 }
 
-.chat-markdown h1 {
-  font-size: 2rem;
-}
+.chat-markdown h1 { font-size: 2rem; }
+.chat-markdown h2 { font-size: 1.7rem; }
+.chat-markdown h3 { font-size: 1.4rem; }
+.chat-markdown h4 { font-size: 1.2rem; }
 
-.chat-markdown h2 {
-  font-size: 1.6rem;
-}
-
-.chat-markdown h3 {
-  font-size: 1.35rem;
-}
-
-/* Paragraphs */
+/* =========================
+   PARAGRAPHS
+========================= */
 
 .chat-markdown p {
-  margin: 12px 0;
+  margin: 0.9rem 0;
 }
 
-/* Lists */
+/* =========================
+   LISTS
+========================= */
 
 .chat-markdown ul,
 .chat-markdown ol {
-  margin: 14px 0;
-  padding-left: 28px;
+  padding-left: 2rem;
+  margin: 1rem 0;
 }
 
 .chat-markdown li {
-  margin: 8px 0;
+  margin: 0.45rem 0;
+  padding-left: 0.2rem;
 }
 
-/* Blockquotes */
+/* =========================
+   BLOCKQUOTES
+========================= */
 
 .chat-markdown blockquote {
   border-left: 4px solid #4ade80;
-  padding-left: 16px;
-  margin: 18px 0;
-  color: #cfcfcf;
   background: rgba(255,255,255,0.03);
+  padding: 12px 18px;
+  margin: 18px 0;
+  color: #d6d6d6;
+  border-radius: 8px;
 }
 
-/* Tables */
+/* =========================
+   TABLES
+========================= */
 
 .chat-markdown table {
   width: 100%;
@@ -78,18 +83,23 @@
 }
 
 .chat-markdown th {
-  background: #181818;
+  background: #1a1a1a;
+  font-weight: 600;
 }
 
-/* Horizontal line */
+/* =========================
+   HORIZONTAL RULE
+========================= */
 
 .chat-markdown hr {
   border: none;
   border-top: 1px solid #333;
-  margin: 28px 0;
+  margin: 26px 0;
 }
 
-/* Links */
+/* =========================
+   LINKS
+========================= */
 
 .chat-markdown a {
   color: #4ade80;
@@ -100,10 +110,12 @@
   text-decoration: underline;
 }
 
-/* Inline code */
+/* =========================
+   INLINE CODE
+========================= */
 
 .chat-markdown code:not(pre code) {
-  background: #1d1d1d;
+  background: #1b1b1b;
   color: #4ade80;
   padding: 3px 6px;
   border-radius: 6px;
@@ -111,13 +123,15 @@
   font-size: 0.95em;
 }
 
-/* Code blocks */
+/* =========================
+   CODE BLOCKS
+========================= */
 
 .chat-markdown pre {
-  background: #101010;
+  background: #111111;
   border: 1px solid #262626;
   border-radius: 12px;
-  padding: 18px;
+  padding: 16px;
   overflow-x: auto;
   margin: 22px 0;
 }
@@ -129,7 +143,9 @@
   font-size: 14px;
 }
 
-/* Images */
+/* =========================
+   IMAGES
+========================= */
 
 .chat-markdown img {
   max-width: 100%;
@@ -137,81 +153,66 @@
   margin: 16px 0;
 }
 
-/* =========================
-   KaTeX
-========================= */
-
-.chat-markdown .katex-display {
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 18px 0;
-  margin: 22px 0;
-  background: rgba(255,255,255,0.03);
-  border-radius: 12px;
-}
+/* ==========================================
+   KaTeX (Math Rendering)
+========================================== */
 
 .chat-markdown .katex {
-  font-size: 1.18em;
+  font-size: 1.2em;
+}
+
+.chat-markdown .katex-display {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  padding: 14px 0;
+  margin: 20px 0;
 }
 
 .chat-markdown .katex-display > .katex {
-  text-align: center;
+  display: inline-block;
 }
 
 .chat-markdown .katex-html {
   color: white;
 }
-.chat-markdown {
-  line-height: 1.8;
-}
 
-.chat-markdown p {
-  margin: 0.7rem 0;
-}
-
-.chat-markdown h1,
-.chat-markdown h2,
-.chat-markdown h3 {
-  margin-top: 1rem;
-  margin-bottom: 0.6rem;
-}
-
-.chat-markdown ul,
-.chat-markdown ol {
-  padding-left: 1.5rem;
-}
-
-.chat-markdown code {
-  background: #1a1a1a;
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-
-.chat-markdown pre {
-  background: #111;
-  padding: 12px;
-  border-radius: 8px;
-  overflow-x: auto;
-}
-
-.chat-markdown .katex-display {
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 10px 0;
-}
-
-/* Nice spacing after equations */
+/* Space after displayed equations */
 
 .chat-markdown .katex-display + p {
   margin-top: 18px;
 }
 
-.chat-markdown .katex {
-  font-size: 1.15em;
+/* =========================
+   STRONG / EMPHASIS
+========================= */
+
+.chat-markdown strong {
+  color: white;
+  font-weight: 700;
 }
 
-.chat-markdown .katex-display {
-  margin: 1rem 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+.chat-markdown em {
+  color: #f2f2f2;
+}
+
+/* =========================
+   SCROLLBAR (Code + Equations)
+========================= */
+
+.chat-markdown pre::-webkit-scrollbar,
+.chat-markdown .katex-display::-webkit-scrollbar {
+  height: 8px;
+}
+
+.chat-markdown pre::-webkit-scrollbar-thumb,
+.chat-markdown .katex-display::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 8px;
+}
+
+.chat-markdown pre::-webkit-scrollbar-track,
+.chat-markdown .katex-display::-webkit-scrollbar-track {
+  background: transparent;
 }
