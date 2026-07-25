@@ -1050,7 +1050,8 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                   key={i}
                   style={{
                     alignSelf: "flex-start",
-                    maxWidth: "80%",
+                    maxWidth: "900px",
+                    width: "100%",
                     background: "#0d0d0d",
                     border: "1px solid #1e1e1e",
                     borderRadius: 8,
