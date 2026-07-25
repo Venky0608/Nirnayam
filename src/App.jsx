@@ -1063,14 +1063,21 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                     overflowX: "auto"
                   }}
                 >
-                  <ReactMarkdown
-                    className="chat-markdown"
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
-                  >
-                    {m.text || ""}
-                  </ReactMarkdown>
-                </div>
+                  <div className="chat-markdown">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm, remarkMath]}
+                      rehypePlugins={[rehypeKatex]}
+                    >
+                      {m.text || ""}
+                    </ReactMarkdown>
+                  
+                    {loading &&
+                      i === messages.length - 1 &&
+                      m.role === "assistant" &&
+                      m.kind === "chat" && (
+                        <span className="stream-cursor">▌</span>
+                      )}
+                  </div>
               );
             })}
           </div>
