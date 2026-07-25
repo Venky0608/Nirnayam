@@ -1,18 +1,19 @@
-/* ==========================================
-   NIRNAYAM STUDY CHATBOT MARKDOWN STYLING
-========================================== */
+/* ==========================================================
+   NIRNAYAM CHAT MARKDOWN
+========================================================== */
 
 .chat-markdown {
   font-family: "Inter", sans-serif;
   color: #e5e5e5;
   font-size: 15px;
   line-height: 1.9;
-  overflow-wrap: break-word;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
-/* =========================
+/* ==========================================================
    HEADINGS
-========================= */
+========================================================== */
 
 .chat-markdown h1,
 .chat-markdown h2,
@@ -22,85 +23,103 @@
 .chat-markdown h6 {
   color: #ffffff;
   font-weight: 700;
-  margin: 1.4rem 0 0.8rem;
+  line-height: 1.35;
+  margin-top: 1.6rem;
+  margin-bottom: 0.8rem;
 }
 
-.chat-markdown h1 { font-size: 2rem; }
-.chat-markdown h2 { font-size: 1.7rem; }
-.chat-markdown h3 { font-size: 1.4rem; }
-.chat-markdown h4 { font-size: 1.2rem; }
+.chat-markdown h1 {
+  font-size: 2rem;
+}
 
-/* =========================
+.chat-markdown h2 {
+  font-size: 1.65rem;
+}
+
+.chat-markdown h3 {
+  font-size: 1.4rem;
+}
+
+/* ==========================================================
    PARAGRAPHS
-========================= */
+========================================================== */
 
 .chat-markdown p {
-  margin: 0.9rem 0;
+  margin: 0.8rem 0;
 }
 
-/* =========================
+/* ==========================================================
    LISTS
-========================= */
+========================================================== */
 
 .chat-markdown ul,
 .chat-markdown ol {
-    padding-left: 1.6rem;
-    margin-left: 0;
-    list-style-position: outside;
+  margin: 0.9rem 0;
+  padding-left: 1.8rem;
+  list-style-position: inside;
 }
 
 .chat-markdown li {
   margin: 0.45rem 0;
-  padding-left: 0.2rem;
+  line-height: 1.8;
 }
 
-/* =========================
+/* Nested Lists */
+
+.chat-markdown ul ul,
+.chat-markdown ol ol,
+.chat-markdown ul ol,
+.chat-markdown ol ul {
+  margin-top: 0.3rem;
+  margin-bottom: 0.3rem;
+}
+
+/* ==========================================================
    BLOCKQUOTES
-========================= */
+========================================================== */
 
 .chat-markdown blockquote {
   border-left: 4px solid #4ade80;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255,255,255,0.04);
   padding: 12px 18px;
-  margin: 18px 0;
-  color: #d6d6d6;
+  margin: 1.2rem 0;
+  color: #d8d8d8;
   border-radius: 8px;
 }
 
-/* =========================
+/* ==========================================================
    TABLES
-========================= */
+========================================================== */
 
 .chat-markdown table {
   width: 100%;
   border-collapse: collapse;
-  margin: 20px 0;
+  margin: 1.5rem 0;
 }
 
 .chat-markdown th,
 .chat-markdown td {
   border: 1px solid #333;
-  padding: 10px;
+  padding: 10px 12px;
 }
 
 .chat-markdown th {
   background: #1a1a1a;
-  font-weight: 600;
 }
 
-/* =========================
+/* ==========================================================
    HORIZONTAL RULE
-========================= */
+========================================================== */
 
 .chat-markdown hr {
   border: none;
   border-top: 1px solid #333;
-  margin: 26px 0;
+  margin: 2rem 0;
 }
 
-/* =========================
+/* ==========================================================
    LINKS
-========================= */
+========================================================== */
 
 .chat-markdown a {
   color: #4ade80;
@@ -111,12 +130,12 @@
   text-decoration: underline;
 }
 
-/* =========================
+/* ==========================================================
    INLINE CODE
-========================= */
+========================================================== */
 
 .chat-markdown code:not(pre code) {
-  background: #1b1b1b;
+  background: #1d1d1d;
   color: #4ade80;
   padding: 3px 6px;
   border-radius: 6px;
@@ -124,17 +143,17 @@
   font-size: 0.95em;
 }
 
-/* =========================
+/* ==========================================================
    CODE BLOCKS
-========================= */
+========================================================== */
 
 .chat-markdown pre {
   background: #111111;
-  border: 1px solid #262626;
-  border-radius: 12px;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
   padding: 16px;
   overflow-x: auto;
-  margin: 22px 0;
+  margin: 1.5rem 0;
 }
 
 .chat-markdown pre code {
@@ -144,19 +163,19 @@
   font-size: 14px;
 }
 
-/* =========================
+/* ==========================================================
    IMAGES
-========================= */
+========================================================== */
 
 .chat-markdown img {
   max-width: 100%;
   border-radius: 10px;
-  margin: 16px 0;
+  margin: 1rem 0;
 }
 
-/* ==========================================
-   KaTeX (Math Rendering)
-========================================== */
+/* ==========================================================
+   KATEX
+========================================================== */
 
 .chat-markdown .katex {
   font-size: 1.28em;
@@ -166,9 +185,9 @@
   display: block;
   overflow-x: auto;
   overflow-y: hidden;
+  margin: 1.4rem 0;
+  padding: 0.8rem 0;
   text-align: center;
-  padding: 14px 0;
-  margin: 20px 0;
 }
 
 .chat-markdown .katex-display > .katex {
@@ -179,41 +198,53 @@
   color: white;
 }
 
-/* Space after displayed equations */
+/* ==========================================================
+   EQUATION SPACING
+========================================================== */
 
 .chat-markdown .katex-display + p {
-  margin-top: 18px;
+  margin-top: 1rem;
 }
 
-/* =========================
+.chat-markdown p + .katex-display {
+  margin-top: 1rem;
+}
+
+/* ==========================================================
    STRONG / EMPHASIS
-========================= */
+========================================================== */
 
 .chat-markdown strong {
-  color: white;
+  color: #ffffff;
   font-weight: 700;
 }
 
 .chat-markdown em {
-  color: #f2f2f2;
+  color: #dddddd;
 }
 
-/* =========================
-   SCROLLBAR (Code + Equations)
-========================= */
+/* ==========================================================
+   SMALL SCREENS
+========================================================== */
 
-.chat-markdown pre::-webkit-scrollbar,
-.chat-markdown .katex-display::-webkit-scrollbar {
-  height: 8px;
-}
+@media (max-width: 768px) {
+  .chat-markdown {
+    font-size: 14px;
+  }
 
-.chat-markdown pre::-webkit-scrollbar-thumb,
-.chat-markdown .katex-display::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 8px;
-}
+  .chat-markdown .katex {
+    font-size: 1.15em;
+  }
 
-.chat-markdown pre::-webkit-scrollbar-track,
-.chat-markdown .katex-display::-webkit-scrollbar-track {
-  background: transparent;
+  .chat-markdown h1 {
+    font-size: 1.7rem;
+  }
+
+  .chat-markdown h2 {
+    font-size: 1.45rem;
+  }
+
+  .chat-markdown h3 {
+    font-size: 1.25rem;
+  }
 }
