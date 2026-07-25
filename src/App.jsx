@@ -1311,18 +1311,26 @@ export default function Nirnayam() {
         ::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 2px; }
       `}</style>
 
-      {screen === "loading" && (
-        <div className="loading-screen">
-          <div className="thinking-title">
-            Nirnayam
-          </div>
-
-          <div className="thinking-status">
-            Initializing...
-          <span className="dots"></span>
-        </div>
-      </div>
-)}
+               {screen === "loading" && (
+            <div
+              style={{
+                minHeight: "100vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: mono,
+                  fontSize: 13,
+                  color: "#333",
+                }}
+              >
+                loading...
+              </div>
+            </div>
+          )}
       {screen === "landing" && <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />}
       {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} user={user} />}
       {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
