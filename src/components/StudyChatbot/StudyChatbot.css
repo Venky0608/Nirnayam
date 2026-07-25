@@ -44,8 +44,9 @@
 
 .chat-markdown ul,
 .chat-markdown ol {
-  padding-left: 2.5rem;
-  margin: 1rem 0;
+    padding-left: 1.6rem;
+    margin-left: 0;
+    list-style-position: outside;
 }
 
 .chat-markdown li {
