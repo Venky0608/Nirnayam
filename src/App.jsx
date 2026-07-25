@@ -932,7 +932,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
-      behavior: loading ? "auto" : "smooth"
+      behavior: loading ? "auto" : "smooth",
       block: "end",
     });
   }, [messages, loading]);
