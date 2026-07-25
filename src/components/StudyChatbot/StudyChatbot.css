@@ -1,324 +1,251 @@
 /* ==========================================================
-   NIRNAYAM CHAT MARKDOWN
+   NIRNAYAM CHAT MARKDOWN (Final)
+   Fonts:
+   - Inter (UI/Text)
+   - JetBrains Mono (Code)
+   Remember to import in index.html:
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 ========================================================== */
 
-.chat-markdown {
-  font-family: "Inter", sans-serif;
-  color: #e5e5e5;
-  font-size: 15px;
-  line-height: 1.9;
-  word-wrap: break-word;
-  overflow-wrap: anywhere;
+.chat-markdown{
+  font-family:"Inter",system-ui,sans-serif;
+  color:#e8e8e8;
+  font-size:16px;
+  line-height:1.85;
+  font-weight:400;
+  word-wrap:break-word;
+  overflow-wrap:anywhere;
 }
-
-/* ==========================================================
-   HEADINGS
-========================================================== */
 
 .chat-markdown h1,
 .chat-markdown h2,
 .chat-markdown h3,
 .chat-markdown h4,
 .chat-markdown h5,
-.chat-markdown h6 {
-  color: #ffffff;
-  font-weight: 700;
-  line-height: 1.35;
-  margin-top: 1.6rem;
-  margin-bottom: 0.8rem;
+.chat-markdown h6{
+  color:#fff;
+  line-height:1.35;
+  margin-top:1.8rem;
+  margin-bottom:.9rem;
 }
 
-.chat-markdown h1 {
-  font-size: 2rem;
+.chat-markdown h1{
+  font-size:2.1rem;
+  font-weight:800;
+  letter-spacing:-.03em;
 }
 
-.chat-markdown h2 {
-  font-size: 1.65rem;
+.chat-markdown h2{
+  font-size:1.65rem;
+  font-weight:700;
+  letter-spacing:-.02em;
 }
 
-.chat-markdown h3 {
-  font-size: 1.4rem;
+.chat-markdown h3{
+  font-size:1.35rem;
+  font-weight:650;
 }
 
-/* ==========================================================
-   PARAGRAPHS
-========================================================== */
-
-.chat-markdown p {
-  margin: 0.8rem 0;
+.chat-markdown p{
+  margin:1rem 0;
 }
-
-/* ==========================================================
-   LISTS
-========================================================== */
 
 .chat-markdown ul,
-.chat-markdown ol {
-  margin: 0.9rem 0;
-  padding-left: 1.8rem;
-  list-style-position: inside;
+.chat-markdown ol{
+  margin:1rem 0;
+  padding-left:1.7rem;
 }
 
-.chat-markdown li {
-  margin: 0.45rem 0;
-  line-height: 1.8;
+.chat-markdown li{
+  margin:.5rem 0;
+  line-height:1.8;
 }
 
-/* Nested Lists */
-
-.chat-markdown ul ul,
-.chat-markdown ol ol,
-.chat-markdown ul ol,
-.chat-markdown ol ul {
-  margin-top: 0.3rem;
-  margin-bottom: 0.3rem;
+.chat-markdown blockquote{
+  border-left:4px solid #4ade80;
+  background:rgba(255,255,255,.04);
+  border-radius:10px;
+  padding:14px 18px;
+  margin:1.3rem 0;
+  color:#dadada;
 }
 
-/* ==========================================================
-   BLOCKQUOTES
-========================================================== */
-
-.chat-markdown blockquote {
-  border-left: 4px solid #4ade80;
-  background: rgba(255,255,255,0.04);
-  padding: 12px 18px;
-  margin: 1.2rem 0;
-  color: #d8d8d8;
-  border-radius: 8px;
-}
-
-/* ==========================================================
-   TABLES
-========================================================== */
-
-.chat-markdown table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1.5rem 0;
+.chat-markdown table{
+  width:100%;
+  border-collapse:collapse;
+  margin:1.6rem 0;
 }
 
 .chat-markdown th,
-.chat-markdown td {
-  border: 1px solid #333;
-  padding: 10px 12px;
+.chat-markdown td{
+  border:1px solid #333;
+  padding:10px 12px;
 }
 
-.chat-markdown th {
-  background: #1a1a1a;
+.chat-markdown th{
+  background:#1a1a1a;
 }
 
-/* ==========================================================
-   HORIZONTAL RULE
-========================================================== */
-
-.chat-markdown hr {
-  border: none;
-  border-top: 1px solid #333;
-  margin: 2rem 0;
+.chat-markdown hr{
+  border:none;
+  border-top:1px solid #333;
+  margin:2rem 0;
 }
 
-/* ==========================================================
-   LINKS
-========================================================== */
-
-.chat-markdown a {
-  color: #4ade80;
-  text-decoration: none;
+.chat-markdown a{
+  color:#4ade80;
+  text-decoration:none;
 }
 
-.chat-markdown a:hover {
-  text-decoration: underline;
+.chat-markdown a:hover{
+  text-decoration:underline;
 }
 
-/* ==========================================================
-   INLINE CODE
-========================================================== */
-
-.chat-markdown code:not(pre code) {
-  background: #1d1d1d;
-  color: #4ade80;
-  padding: 3px 6px;
-  border-radius: 6px;
-  font-family: "DM Mono", monospace;
-  font-size: 0.95em;
+.chat-markdown code:not(pre code){
+  background:#1b1b1b;
+  color:#4ade80;
+  padding:3px 6px;
+  border-radius:6px;
+  font-family:"JetBrains Mono",monospace;
+  font-size:.94em;
 }
 
-/* ==========================================================
-   CODE BLOCKS
-========================================================== */
-
-.chat-markdown pre {
-  background: #111111;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  padding: 16px;
-  overflow-x: auto;
-  margin: 1.5rem 0;
+.chat-markdown pre{
+  background:#111;
+  border:1px solid #2a2a2a;
+  border-radius:12px;
+  padding:18px;
+  overflow-x:auto;
+  margin:1.6rem 0;
 }
 
-.chat-markdown pre code {
-  background: transparent;
-  color: white;
-  font-family: "DM Mono", monospace;
-  font-size: 14px;
+.chat-markdown pre code{
+  background:transparent;
+  color:#fff;
+  font-family:"JetBrains Mono",monospace;
+  font-size:14px;
 }
 
-/* ==========================================================
-   IMAGES
-========================================================== */
-
-.chat-markdown img {
-  max-width: 100%;
-  border-radius: 10px;
-  margin: 1rem 0;
+.chat-markdown img{
+  max-width:100%;
+  border-radius:12px;
+  margin:1rem 0;
 }
 
-/* ==========================================================
-   KATEX
-========================================================== */
-
-.chat-markdown .katex {
-  font-size: 1.28em;
+.chat-markdown strong{
+  color:#fff;
+  font-weight:700;
 }
 
-.chat-markdown .katex-display {
-  display: block;
-  overflow-x: auto;
-  overflow-y: hidden;
-  margin: 1.4rem 0;
-  padding: 0.8rem 0;
-  text-align: center;
+.chat-markdown em{
+  color:#ddd;
 }
 
-.chat-markdown .katex-display > .katex {
-  display: inline-block;
+.chat-markdown .katex{
+  font-size:1.28em;
 }
 
-.chat-markdown .katex-html {
-  color: white;
+.chat-markdown .katex-display{
+  display:block;
+  overflow-x:auto;
+  overflow-y:hidden;
+  margin:1.5rem 0;
+  padding:.9rem 0;
+  text-align:center;
 }
 
-/* ==========================================================
-   EQUATION SPACING
-========================================================== */
-
-.chat-markdown .katex-display + p {
-  margin-top: 1rem;
+.chat-markdown .katex-display>.katex{
+  display:inline-block;
 }
 
-.chat-markdown p + .katex-display {
-  margin-top: 1rem;
+.chat-markdown .katex-html{
+  color:#fff;
 }
 
-/* ==========================================================
-   STRONG / EMPHASIS
-========================================================== */
-
-.chat-markdown strong {
-  color: #ffffff;
-  font-weight: 700;
+.chat-markdown p+.katex-display,
+.chat-markdown .katex-display+p{
+  margin-top:1rem;
 }
 
-.chat-markdown em {
-  color: #dddddd;
+/* Loading */
+
+.loading-screen{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:14px;
 }
 
-/* ==========================================================
-   SMALL SCREENS
-========================================================== */
+.thinking-title{
+  font-family:"Inter",sans-serif;
+  font-size:34px;
+  font-weight:800;
+  color:#fff;
+  animation:fadePulse 2s ease-in-out infinite;
+}
 
-@media (max-width: 768px) {
-  .chat-markdown {
-    font-size: 14px;
+.thinking-status{
+  font-family:"JetBrains Mono",monospace;
+  font-size:14px;
+  color:#777;
+  letter-spacing:.08em;
+}
+
+.dots::after{
+  content:"";
+  animation:dots 1.4s infinite;
+}
+
+.stream-cursor{
+  display:inline-block;
+  margin-left:4px;
+  color:#fff;
+  font-weight:700;
+  animation:blinkCursor 1s steps(2,start) infinite;
+}
+
+@keyframes blinkCursor{
+  0%,50%{opacity:1;}
+  51%,100%{opacity:0;}
+}
+
+@keyframes dots{
+  0%{content:"";}
+  25%{content:".";}
+  50%{content:"..";}
+  75%{content:"...";}
+  100%{content:"";}
+}
+
+@keyframes fadePulse{
+  0%,100%{opacity:.55;}
+  50%{opacity:1;}
+}
+
+@media (max-width:768px){
+
+  .chat-markdown{
+    font-size:14px;
   }
 
-  .chat-markdown .katex {
-    font-size: 1.15em;
+  .chat-markdown h1{
+    font-size:1.7rem;
   }
 
-  .chat-markdown h1 {
-    font-size: 1.7rem;
+  .chat-markdown h2{
+    font-size:1.45rem;
   }
 
-  .chat-markdown h2 {
-    font-size: 1.45rem;
+  .chat-markdown h3{
+    font-size:1.2rem;
   }
-/* =========================
-   Loading Screen
-========================= */
 
-.loading-screen {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 14px;
-}
-
-.thinking-title {
-    font-family: "Syne", sans-serif;
-    font-size: 34px;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: 0.04em;
-    animation: fadePulse 2s ease-in-out infinite;
-}
-
-.thinking-status {
-    font-family: "DM Mono", monospace;
-    font-size: 14px;
-    color: #777;
-    letter-spacing: 0.08em;
-}
-
-.dots::after {
-    content: "";
-    animation: dots 1.4s infinite;
-}
-
-@keyframes dots {
-    0%   { content: ""; }
-    25%  { content: "."; }
-    50%  { content: ".."; }
-    75%  { content: "..."; }
-    100% { content: ""; }
-}
-
-@keyframes fadePulse {
-    0% {
-        opacity: .55;
-    }
-
-    50% {
-        opacity: 1;
-    }
-
-    100% {
-        opacity: .55;
-    }
-}
-
-.stream-cursor {
-  display: inline-block;
-  margin-left: 3px;
-  color: #fff;
-  font-weight: bold;
-  animation: blinkCursor 1s steps(2, start) infinite;
-}
-
-@keyframes blinkCursor {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-  .chat-markdown h3 {
-    font-size: 1.25rem;
+  .chat-markdown .katex{
+    font-size:1.15em;
   }
 }
