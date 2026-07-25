@@ -243,6 +243,61 @@
   .chat-markdown h2 {
     font-size: 1.45rem;
   }
+/* =========================
+   Loading Screen
+========================= */
+
+.loading-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+}
+
+.thinking-title {
+    font-family: "Syne", sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.04em;
+    animation: fadePulse 2s ease-in-out infinite;
+}
+
+.thinking-status {
+    font-family: "DM Mono", monospace;
+    font-size: 14px;
+    color: #777;
+    letter-spacing: 0.08em;
+}
+
+.dots::after {
+    content: "";
+    animation: dots 1.4s infinite;
+}
+
+@keyframes dots {
+    0%   { content: ""; }
+    25%  { content: "."; }
+    50%  { content: ".."; }
+    75%  { content: "..."; }
+    100% { content: ""; }
+}
+
+@keyframes fadePulse {
+    0% {
+        opacity: .55;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: .55;
+    }
+}
 
   .chat-markdown h3 {
     font-size: 1.25rem;
