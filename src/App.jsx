@@ -932,10 +932,10 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
-      behavior: "smooth",
+      behavior: loading ? "auto" : "smooth"
       block: "end",
     });
-  }, [messages]);
+  }, [messages, loading]);
 
   const handleSend = async () => {
     const trimmed = input.trim();
