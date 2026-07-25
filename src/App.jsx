@@ -1312,10 +1312,17 @@ export default function Nirnayam() {
       `}</style>
 
       {screen === "loading" && (
-        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ fontFamily: mono, fontSize: 13, color: "#333", animation: "pulse 1.5s ease-in-out infinite" }}>loading...</div>
+        <div className="loading-screen">
+          <div className="thinking-title">
+            Nirnayam
+          </div>
+
+          <div className="thinking-status">
+            Initializing...
+          <span className="dots"></span>
         </div>
-      )}
+      </div>
+)}
       {screen === "landing" && <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />}
       {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} user={user} />}
       {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
