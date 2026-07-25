@@ -1078,7 +1078,8 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                         <span className="stream-cursor">▌</span>
                       )}
                   </div>
-              );
+                </div>
+              );  
             })}
           </div>
 
