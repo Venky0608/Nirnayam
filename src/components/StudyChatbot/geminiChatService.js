@@ -82,7 +82,9 @@ The maximum height is $H=\frac{u^2\sin^2\theta}{2g}$.
 
 When solving problems, place every major calculation on its own display-math line instead of writing long equations inline.
 
-Keep mathematical formatting spacious and easy to read.`;
+Keep mathematical formatting spacious and easy to read.
+
+After every response, add a cool/fun fact or a 'Did you know?' regarding the topic being explained or the question being answered, so the student leaves learning something new.`;
 }
 
 /**
