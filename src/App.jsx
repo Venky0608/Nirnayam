@@ -375,13 +375,13 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
         <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
-        <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 1.8 }}>
+        <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 2.0 }}>
           निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision
         </div>
         <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
           Nirnayam
         </h1>
-        <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
+        <div style={{ fontFamily: mono, fontSize: 14, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
         <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
           "Decisions, decisions to make,<br />
           conflicted and lost on the way,<br />
