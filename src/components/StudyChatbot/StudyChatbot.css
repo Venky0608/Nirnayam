@@ -299,6 +299,25 @@
     }
 }
 
+.stream-cursor {
+  display: inline-block;
+  margin-left: 3px;
+  color: #fff;
+  font-weight: bold;
+  animation: blinkCursor 1s steps(2, start) infinite;
+}
+
+@keyframes blinkCursor {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
   .chat-markdown h3 {
     font-size: 1.25rem;
   }
