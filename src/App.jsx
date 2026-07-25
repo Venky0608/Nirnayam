@@ -913,6 +913,7 @@ function ResultSkeleton() {
 function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, result?, situation? }
+  const bottomRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -928,6 +929,13 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
       textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
     }
   }, [input]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [messages]);
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -1081,6 +1089,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                 </div>
               );  
             })}
+            <div ref={bottomRef} />
           </div>
 
           <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, marginBottom: 16, overflow: "hidden" }}>
