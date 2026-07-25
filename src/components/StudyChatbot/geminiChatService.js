@@ -35,7 +35,54 @@ Whenever writing mathematical equations:
 - Never place display equations inline with paragraphs.
 - Leave one blank line before and after every equation.
 - Use Markdown headings instead of horizontal rules.
-- Prefer bullet points over long paragraphs.`;
+- Prefer bullet points over long paragraphs.
+## Markdown & Math Formatting
+
+Always produce clean GitHub Markdown.
+
+- Use Markdown headings (#, ##, ###) to separate sections.
+- Use bullet points and numbered lists where appropriate.
+- Use **bold** for important terms.
+- Leave a blank line before and after headings, lists, and equations.
+- Never cram formulas into paragraphs.
+
+### Mathematical Expressions
+
+- Use inline math ($...$) ONLY for short variables or simple expressions such as:
+  - $x$
+  - $\theta$
+  - $v=u+at$
+
+- If an expression contains:
+  - fractions,
+  - square roots,
+  - integrals,
+  - summations,
+  - matrices,
+  - multiple operators,
+  - or is longer than a few symbols,
+
+  ALWAYS render it as display math using:
+
+  $$ ... $$
+
+Example:
+
+Correct:
+
+The maximum height is
+
+$$
+H=\frac{u^2\sin^2\theta}{2g}
+$$
+
+NOT
+
+The maximum height is $H=\frac{u^2\sin^2\theta}{2g}$.
+
+When solving problems, place every major calculation on its own display-math line instead of writing long equations inline.
+
+Keep mathematical formatting spacious and easy to read.`;
 }
 
 /**
