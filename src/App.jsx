@@ -1045,8 +1045,28 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                 );
               }
               return (
-                <div key={i} style={{ alignSelf: "flex-start", maxWidth: "80%", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "10px 14px", fontFamily: mono, fontSize: 14, lineHeight: 1.7, color: "#ccc", whiteSpace: "pre-wrap" }}>
-                  {m.text || "···"}
+                <div
+                  key={i}
+                  style={{
+                    alignSelf: "flex-start",
+                    maxWidth: "80%",
+                    background: "#0d0d0d",
+                    border: "1px solid #1e1e1e",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    fontFamily: mono,
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    color: "#ccc",
+                    overflowX: "auto"
+                  }}
+                >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
+                    {m.text || ""}
+                  </ReactMarkdown>
                 </div>
               );
             })}
