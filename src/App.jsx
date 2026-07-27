@@ -373,6 +373,7 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center", position: "relative" }}>
       <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`, pointerEvents: "none" }} />
       <div style={{ position: "relative", zIndex: 1, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 520, width: "100%", marginTop: !user ? 40 : 0 }}>
+        {isReturning ? (
         <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
