@@ -584,7 +584,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: "32px 20px 60px" }}>
       <div style={{ width: "100%", maxWidth: 560 }}>
         {step === 0 && (
-          <div style={{ fontFamily: mono, fontSize: 13, color: "#777", textAlign: "center", marginBottom: 28, lineHeight: 1.8, padding: "14px 20px", border: "1px solid #1e1e1e", borderRadius: 6, background: "#0a0a0a" }}>
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#777", textAlign: "center", marginBottom: 28, lineHeight: 1.8, padding: "14px 20px", border: "1px solid #1e1e1e", borderRadius: 6, background: "#000000" }}>
             Answer these honestly — the more Nirnayam knows you, the better the advice.
           </div>
         )}
