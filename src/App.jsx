@@ -1092,8 +1092,9 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
             <div ref={bottomRef} />
           </div>
 
+          
           <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, marginBottom: 16, overflow: "hidden" }}>
-            <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSend(); }}
+            <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) {e.preventDefault();if (!loading && input.trim()) {handleSend();}}}}
               placeholder={"Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'"}
               style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 100, outline: "none", boxSizing: "border-box" }} />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
