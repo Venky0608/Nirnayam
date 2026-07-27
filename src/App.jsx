@@ -349,24 +349,12 @@ window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); defe
 
 function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, authLoading }) {
   const [visible, setVisible] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [installable, setInstallable] = useState(!!deferredPrompt);
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 100);
-    const handler = () => setInstallable(true);
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
   const isReturning = user && profile;
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") { deferredPrompt = null; setInstallable(false); }
-  };
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center", position: "relative" }}>
