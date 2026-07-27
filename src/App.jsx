@@ -472,6 +472,8 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
     </div>
   </div>
 );
+}
+
 function OnboardingPage({ onComplete, initialAnswers, user }) {
   const [step, setStep] = useState(0);
   const [stream, setStream] = useState(initialAnswers?.stream || "");
