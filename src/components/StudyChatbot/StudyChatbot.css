@@ -26,10 +26,12 @@
 .chat-markdown h4,
 .chat-markdown h5,
 .chat-markdown h6{
+  font-family: "Syne", sans-serif;
   color:#fff;
   line-height:1.35;
   margin-top:1.8rem;
   margin-bottom:.9rem;
+
 }
 
 .chat-markdown h1{
