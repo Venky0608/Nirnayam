@@ -391,25 +391,7 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
         <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
           Nirnayam is an AI chatbot that helps students make better decisions and learn concepts better — whether you're torn between basketball practice and studying, unsure about a topic, or confused about what to do and how to prioritise, Nirnayam's got your back.
         </div>
-        {!expanded ? (
-          <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 32, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
-            Why I built this →
-          </button>
-        ) : (
-          <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 32, lineHeight: 1.9, textAlign: "left", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "24px" }}>
-            <p style={{ marginTop: 0, marginBottom: 16 }}>In students, the decision-making part of the brain is still developing. When tough choices come up, it's easy to make decisions you regret — or avoid the decision entirely and doomscroll. As a student myself, I've faced this many times.</p>
-            <p style={{ marginBottom: 16 }}>So I built Nirnayam. Through a short onboarding, it gets to know you well: your subjects, priorities, how stress affects you, and your learning style. All you need to do is describe your situation honestly.</p>
-            <p style={{ marginBottom: 16 }}>Nirnayam gives you a clear recommendation, a confidence score, a step-by-step action plan, and flags anything to watch out for. Rate each decision and it learns your patterns over time.</p>
-            <p style={{ marginBottom: 16 }}>In the world of AI, let's use it for good. This is a start.</p>
-            <button onClick={() => setExpanded(false)} style={{ background: "transparent", border: "none", color: "#555", fontFamily: mono, fontSize: 12, cursor: "pointer", textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>Show less ↑</button>
-          </div>
-        )}
-        {installable && (
-          <button onClick={handleInstall} style={{ background: "transparent", color: "#4ade80", border: "1px solid #4ade80", borderRadius: 5, padding: "10px 24px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 20px", WebkitTapHighlightColor: "transparent" }}>
-            ↓ Install Nirnayam as an App
-          </button>
-        )}
-        {isReturning ? (
+  
           <div>
             <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
               onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
