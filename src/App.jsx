@@ -9,6 +9,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import "./components/StudyChatbot/StudyChatbot.css";
+import nirnayamLogo from "./assets/nirnayam-logo.png";
 const mono = "'DM Mono', monospace";
 const syne = "'Syne', sans-serif";
 const urgencyColor = (u) => ({ low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171" }[u] || "#888");
@@ -375,21 +376,22 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
         <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
           <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
+        <img src={nirnayamLogo} alt="Nirnayam compass logo" style={{ width: 76, height: 76, margin: "0 auto 24px", display: "block" }} />
         <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 2.0 }}>
           निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision
         </div>
         <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
           Nirnayam
         </h1>
-        <div style={{ fontFamily: mono, fontSize: 14, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
+        <div style={{ fontFamily: mono, fontSize: 14, color: "#4ade80", marginBottom: 28, letterSpacing: "0.15em", textTransform: "uppercase" }}>Find Your True North</div>
         <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
-          "Decisions, decisions to make,<br />
-          conflicted and lost on the way,<br />
-          so Nirnayam's advice you should take,<br />
-          so we can be better than yesterday."
+          "So many roads, so much to decide,<br />
+          a hundred voices pulling each side,<br />
+          so Nirnayam becomes your compass and guide,<br />
+          pointing you back to your true north inside."
         </div>
         <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
-          Nirnayam is an AI chatbot that helps students make better decisions — whether you're torn between basketball practice and studying, unsure whether to rest or keep grinding, or confused about which subject to tackle first.
+          Nirnayam is your AI companion for student life — ask what to do when you're torn between two things, or ask it to explain what you don't understand. One conversation, always pointing you toward what matters most.
         </div>
         {!expanded ? (
           <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 32, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
