@@ -870,7 +870,7 @@ function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
         {selected === 0 ? "Did Nirnayam's advice actually help you?" : selected <= 2 ? "Got it — Nirnayam will adjust" : selected <= 3 ? "Thanks for the feedback" : "Great — Nirnayam will remember this works"}
       </div>
       {showSignInPrompt && (
-        <div style={{ marginTop: 16, background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "16px", textAlign: "center" }}>
+        <div style={{ marginTop: 16, background: "#000000", border: "1px solid #222", borderRadius: 6, padding: "16px", textAlign: "center" }}>
           <div style={{ fontFamily: mono, fontSize: 13, color: "#aaa", marginBottom: 12, lineHeight: 1.7 }}>
             Sign in to enable personalisation.<br />
             <span style={{ color: "#666", fontSize: 12 }}>Your ratings train Nirnayam to learn your patterns over time.</span>
