@@ -369,108 +369,109 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
   };
 
   return (
-  <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center", position: "relative" }}>
-    <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`, pointerEvents: "none" }} />
-
-    <div style={{ position: "relative", zIndex: 1, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 520, width: "100%", marginTop: !user ? 40 : 0 }}>
-
-      {isReturning ? (
-        <>
-          <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
-            <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
-          </div>
-
-          <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 2.0 }}>
-            {"निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision"}
-          </div>
-
-          <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
-            Nirnayam
-          </h1>
-
-          <div style={{ fontFamily: mono, fontSize: 14, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>
-            Find Your True North
-          </div>
-
-          <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
-            So many roads, so much to decide,<br />
-            a hundred voices pulling each side,<br />
-            so Nirnayam becomes your compass and guide,<br />
-            pointing you back to your true north inside.
-          </div>
-
-          <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
-            Nirnayam is your AI companion for student life — ask what to do when you're torn between two things, or ask it to explain what you don't understand. One conversation, always pointing you toward what matters most.
-          </div>
-
-          <button
-            onClick={onContinue}
-            style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
-          >
-            Continue as {user.displayName?.split(" ")[0]} →
-          </button>
-
-          <div style={{ fontFamily: mono, fontSize: 12, color: "#444" }}>
-            Signed in as {user.email}
-          </div>
-        </>
-      ) : user && !profile ? (
-        <div>
-          <button
-            onClick={onContinue}
-            style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
-          >
-            Set up your profile →
-          </button>
-
-          <div style={{ fontFamily: mono, fontSize: 12, color: "#444" }}>
-            Signed in as {user.email}
-          </div>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center", position: "relative" }}>
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`, pointerEvents: "none" }} />
+      <div style={{ position: "relative", zIndex: 1, opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(24px)", transition: "all 0.8s cubic-bezier(0.16, 1, 0.3, 1)", maxWidth: 520, width: "100%", marginTop: !user ? 40 : 0 }}>
+        <div style={{ width: 60, height: 60, border: "1px solid #444", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
+          <div style={{ width: 22, height: 22, border: "1px solid #888", transform: "rotate(45deg)" }} />
         </div>
-      ) : (
-        <div>
-          <button
-            onClick={onGoogleSignIn}
-            disabled={authLoading}
-            style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: authLoading ? "not-allowed" : "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent", opacity: authLoading ? 0.6 : 1 }}
-            onMouseEnter={e => { if (!authLoading) e.currentTarget.style.background = "#e5e5e5"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
-          >
-            {authLoading ? "signing in..." : "Continue with Google"}
-          </button>
-
-          <button
-            onClick={onGuestStart}
-            style={{ background: "transparent", color: "#aaa", border: "1px solid #444", borderRadius: 5, padding: "12px 36px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 14px", WebkitTapHighlightColor: "transparent" }}
-          >
-            Continue without account
-          </button>
-
-          <div style={{ fontFamily: mono, fontSize: 14, color: "#bbb", lineHeight: 1.9, marginTop: 4, padding: "0 8px" }}>
-            ⚠ Your profile <span style={{ color: "#facc15" }}>won't be saved</span> as a guest.
-            <br />
-            <span style={{ fontSize: 13, color: "#777" }}>
-              Sign in to save your profile and unlock personalisation.
-            </span>
-          </div>
+        <div style={{ fontFamily: mono, fontSize: "clamp(10px, 2.2vw, 12px)", letterSpacing: "0.15em", color: "#666", marginBottom: 14, lineHeight: 2.0 }}>
+          निर्णय · నిర్ణయం · ನಿರ್ಣಯ · முடிவு · നിർണ്ണയം · Decision
         </div>
-      )}
-
-      <div style={{ marginTop: 20, fontFamily: mono, fontSize: 12, color: "#333" }}>
-        Free · No payment needed
+        <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
+          Nirnayam
+        </h1>
+        <div style={{ fontFamily: mono, fontSize: 14, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
+        <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
+          "Decisions, decisions to make,<br />
+          conflicted and lost on the way,<br />
+          so Nirnayam's advice you should take,<br />
+          so we can be better than yesterday."
+        </div>
+        <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
+          Nirnayam is an AI chatbot that helps students make better decisions — whether you're torn between basketball practice and studying, unsure whether to rest or keep grinding, or confused about which subject to tackle first.
+        </div>
+        {!expanded ? (
+          <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 32, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
+            Why I built this →
+          </button>
+        ) : (
+          <div style={{ fontFamily: mono, fontSize: 14, color: "#888", marginBottom: 32, lineHeight: 1.9, textAlign: "left", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "24px" }}>
+            <p style={{ marginTop: 0, marginBottom: 16 }}>In students, the decision-making part of the brain is still developing. When tough choices come up, it's easy to make decisions you regret — or avoid the decision entirely and doomscroll. As a student myself, I've faced this many times.</p>
+            <p style={{ marginBottom: 16 }}>So I built Nirnayam. Through a short onboarding, it gets to know you well: your subjects, priorities, how stress affects you, and your learning style. All you need to do is describe your situation honestly.</p>
+            <p style={{ marginBottom: 16 }}>Nirnayam gives you a clear recommendation, a confidence score, a step-by-step action plan, and flags anything to watch out for. Rate each decision and it learns your patterns over time.</p>
+            <p style={{ marginBottom: 16 }}>In the world of AI, let's use it for good. This is a start.</p>
+            <button onClick={() => setExpanded(false)} style={{ background: "transparent", border: "none", color: "#555", fontFamily: mono, fontSize: 12, cursor: "pointer", textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>Show less ↑</button>
+          </div>
+        )}
+        {installable && (
+          <button onClick={handleInstall} style={{ background: "transparent", color: "#4ade80", border: "1px solid #4ade80", borderRadius: 5, padding: "10px 24px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 20px", WebkitTapHighlightColor: "transparent" }}>
+            ↓ Install Nirnayam as an App
+          </button>
+        )}
+        {isReturning ? (
+          <div>
+            <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
+              Continue as {user.displayName?.split(" ")[0]} →
+            </button>
+            <div style={{ fontFamily: mono, fontSize: 12, color: "#444" }}>Signed in as {user.email}</div>
+          </div>
+        ) : user && !profile ? (
+          <div>
+            <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
+              Set up your profile →
+            </button>
+            <div style={{ fontFamily: mono, fontSize: 12, color: "#444" }}>Signed in as {user.email}</div>
+          </div>
+        ) : (
+          <div>
+            <button onClick={onGoogleSignIn} disabled={authLoading} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: authLoading ? "not-allowed" : "pointer", display: "block", margin: "0 auto 12px", WebkitTapHighlightColor: "transparent", opacity: authLoading ? 0.6 : 1 }}
+              onMouseEnter={e => { if (!authLoading) e.currentTarget.style.background = "#e5e5e5"; }} onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}>
+              {authLoading ? "signing in..." : "Continue with Google"}
+            </button>
+            <button onClick={onGuestStart} style={{ background: "transparent", color: "#aaa", border: "1px solid #444", borderRadius: 5, padding: "12px 36px", fontFamily: mono, fontSize: 13, cursor: "pointer", display: "block", margin: "0 auto 14px", WebkitTapHighlightColor: "transparent" }}>
+              Continue without account
+            </button>
+            <div style={{ fontFamily: mono, fontSize: 14, color: "#bbb", lineHeight: 1.9, marginTop: 4, padding: "0 8px" }}>
+              ⚠ Your profile <span style={{ color: "#facc15" }}>won't be saved</span> as a guest.<br />
+              <span style={{ fontSize: 13, color: "#777" }}>Sign in to save your profile and unlock personalisation.</span>
+            </div>
+          </div>
+        )}
+        <div style={{ marginTop: 20, fontFamily: mono, fontSize: 12, color: "#333" }}>Free · No payment needed</div>
+        <div style={{ marginTop: 28, fontFamily: mono, fontSize: 13, color: "#3a3a3a", letterSpacing: "0.05em" }}>Created by Venkat Sai Varanasi</div>
       </div>
-
-      <div style={{ marginTop: 28, fontFamily: mono, fontSize: 13, color: "#3a3a3a", letterSpacing: "0.05em" }}>
-        Created by Venkat Sai Varanasi
-      </div>
-
     </div>
-  </div>
-);
+  );
+}
+
+function OnboardingTimeline({ currentStep, totalSteps, labels }) {
+  const CIRCLE = 30;
+  const HALF = CIRCLE / 2;
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ position: "absolute", top: HALF, left: HALF, right: HALF, height: 2, background: "#1a1a1a", zIndex: 0 }} />
+        <div style={{ position: "absolute", top: HALF, left: HALF, height: 2, background: "#4ade80", zIndex: 0, width: currentStep === 0 ? "0%" : `${(currentStep / (totalSteps - 1)) * (100 - (HALF / 3))}%`, transition: "width 0.4s ease" }} />
+        {labels.map((label, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", zIndex: 1 }}>
+            <div style={{ width: CIRCLE, height: CIRCLE, borderRadius: "50%", background: i <= currentStep ? "#4ade80" : "#0d0d0d", border: `2px solid ${i <= currentStep ? "#4ade80" : "#2a2a2a"}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: mono, fontSize: 11, color: i <= currentStep ? "#000" : "#444", transition: "all 0.3s ease", flexShrink: 0 }}>
+              {i < currentStep ? "✓" : i + 1}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        {labels.map((label, i) => (
+          <div key={i} style={{ flex: 1, textAlign: "center" }}>
+            <span style={{ fontFamily: mono, fontSize: "clamp(8px, 1.5vw, 11px)", color: i === currentStep ? "#4ade80" : i < currentStep ? "#4ade8099" : "#2a2a2a", letterSpacing: "0.04em", textTransform: "uppercase", transition: "color 0.3s ease" }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function OnboardingPage({ onComplete, initialAnswers, user }) {
