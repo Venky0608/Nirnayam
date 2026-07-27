@@ -381,15 +381,15 @@ function LandingPage({ user, profile, onGoogleSignIn, onGuestStart, onContinue, 
         <h1 style={{ width: "100%", display: "flex", justifyContent: "center", textAlign: "center", fontFamily: syne, fontSize: "clamp(40px, 11vw, 92px)", fontWeight: 800, margin: "0 0 8px", lineHeight: 0.9, letterSpacing: "-0.03em", color: "#fff", wordBreak: "keep-all" }}>
           Nirnayam
         </h1>
-        <div style={{ fontFamily: mono, fontSize: 14, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Your student decision advisor</div>
+        <div style={{ fontFamily: mono, fontSize: 14, color: "#555", marginBottom: 28, letterSpacing: "0.1em" }}>Find Your True North</div>
         <div style={{ fontFamily: mono, fontSize: "clamp(14px, 2.5vw, 16px)", lineHeight: 2.3, color: "#bbb", margin: "0 0 28px", fontStyle: "italic", padding: "0 8px" }}>
-          "Decisions, decisions to make,<br />
-          conflicted and lost on the way,<br />
-          so Nirnayam's advice you should take,<br />
-          so we can be better than yesterday."
+          "So many roads, so much to decide,<br />
+          a hundred voices pulling each side,<br />
+          so Nirnayam becomes your compass and guide,<br />
+          pointing you back to your true north inside."
         </div>
         <div style={{ fontFamily: mono, fontSize: "clamp(13px, 2.2vw, 15px)", color: "#999", marginBottom: 16, lineHeight: 2, padding: "0 4px" }}>
-          Nirnayam is an AI chatbot that helps students make better decisions — whether you're torn between basketball practice and studying, unsure whether to rest or keep grinding, or confused about which subject to tackle first.
+          Nirnayam is an AI chatbot that helps students make better decisions and learn concepts better — whether you're torn between basketball practice and studying, unsure about a topic, or confused about what to do and how to prioritise, Nirnayam's got your back.
         </div>
         {!expanded ? (
           <button onClick={() => setExpanded(true)} style={{ background: "transparent", border: "none", color: "#666", fontFamily: mono, fontSize: 13, cursor: "pointer", marginBottom: 32, textDecoration: "underline", WebkitTapHighlightColor: "transparent" }}>
