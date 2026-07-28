@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 import { streamChatResponse } from "./components/StudyChatbot/geminiChatService";
 import ReactMarkdown from "react-markdown";
@@ -1065,12 +1065,19 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const bottomRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showHistory, setShowHistory] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
+  const [chatTitle, setChatTitle] = useState("New Chat");
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
+  const messagesRef = useRef([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     if (textareaRef.current) {
