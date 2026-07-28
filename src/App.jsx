@@ -1179,6 +1179,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
               ⚙ Settings
             </button>
           </div>
+      </div>
      
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
