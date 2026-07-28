@@ -1052,10 +1052,8 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const bottomRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
-  const [history, setHistory] = useState([]);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
 
@@ -1089,7 +1087,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
       if (intent === "decision" || intent === "both") {
         const res = await callNirnayam(trimmed, profile, personData);
         setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation: trimmed }]);
-        setHistory(prev => [{ situation: trimmed, result: res, time: new Date().toLocaleTimeString() }, ...prev.slice(0, 9)]);
+        
       }
 
       if (intent === "study" || intent === "both") {
@@ -1155,9 +1153,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <button onClick={() => setShowHistory(!showHistory)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
-            {showHistory ? "← back" : `history (${history.length})`}
-          </button>
+         
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
             <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 5 }}>
               ⚙ settings
@@ -1167,9 +1163,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
         </div>
       </div>
 
-      {showHistory ? (
-        <HistoryView history={history} onSelect={(h) => { setShowHistory(false); }} />
-      ) : (
+     
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
             {messages.map((m, i) => {
@@ -1376,27 +1370,6 @@ function ResultView({ result, urgencyInfo }) {
           <span style={{ fontFamily: mono, fontSize: 14, color: "#888", lineHeight: 1.7 }}>{result.warning}</span>
         </div>
       )}
-    </div>
-  );
-}
-
-function HistoryView({ history, onSelect }) {
-  if (history.length === 0) return <div style={{ textAlign: "center", padding: "60px 0", fontFamily: mono, fontSize: 14, color: "#2a2a2a" }}>No decisions yet this session.</div>;
-  return (
-    <div>
-      <div style={{ fontFamily: mono, fontSize: 11, color: "#2a2a2a", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>This session</div>
-      {history.map((h, i) => (
-        <div key={i} onClick={() => onSelect(h)} style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6, padding: "14px 16px", marginBottom: 8, cursor: "pointer" }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = "#333"}
-          onMouseLeave={e => e.currentTarget.style.borderColor = "#1a1a1a"}>
-          <div style={{ fontFamily: mono, fontSize: 13, color: "#777", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>{h.situation}</div>
-          <div style={{ display: "flex", gap: 16, fontFamily: mono, fontSize: 12, color: "#333" }}>
-            <span>{h.result.confidence}%</span>
-            <span style={{ color: urgencyColor(h.result.urgency) }}>{h.result.urgency}</span>
-            <span>{h.time}</span>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
