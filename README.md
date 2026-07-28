@@ -1,17 +1,18 @@
 <div align="center">
 
 # 🧠 NIRNAYAM
+
 ### *Your AI-Powered Decision & Learning Companion*
 
-[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Visit_Nirnayam-22c55e?style=for-the-badge)](https://nirnayam.vercel.app/)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/Venky0608/Nirnayam)
+Helping students make smarter decisions, learn more effectively, and unlock their full academic potential through Artificial Intelligence.
 
+<br>
 
 ---
 
-### 🎯 Built for the **Prometheus AI July Hackathon**
+### 🏆 Built for the **Prometheus AI July Hackathon**
 
-*Helping students make smarter decisions, learn more effectively, and overcome academic overwhelm using Artificial Intelligence.*
+*"Every student deserves an AI that understands how they learn—not just what they ask."*
 
 </div>
 
@@ -19,35 +20,35 @@
 
 # 📖 Table of Contents
 
-- [Overview](#-overview)
-- [The Problem](#-the-problem)
-- [Our Solution](#-our-solution)
-- [Key Features](#-key-features)
-- [How Nirnayam Works](#-how-nirnayam-works)
-- [AI & Machine Learning Pipeline](#-ai--machine-learning-pipeline)
-- [Personalization Engine](#-personalization-engine)
+- Overview
+- The Problem
+- Our Solution
+- Why Nirnayam?
+- Core Features
+- AI & Machine Learning Architecture
+- Technology Stack
+- Educational Impact
+- Future Roadmap
+- Acknowledgements
+- License
 
 ---
 
 # 🌍 Overview
 
-Students make hundreds of decisions every single week.
+Artificial Intelligence has transformed how students access information, but it has not fundamentally changed **how students learn**.
 
-- Which homework should I complete first?
-- Should I revise or solve problems?
-- Which topic deserves more time?
-- How should I study this concept?
-- Am I actually learning effectively?
+Most AI assistants today excel at answering questions, yet they treat every learner the same. A ninth-grade student, a college freshman, and someone preparing for competitive examinations often receive nearly identical explanations despite having vastly different backgrounds, goals, and learning preferences. The result is an experience that feels informative but rarely personal.
 
-Most AI chatbots can answer questions.
+**Nirnayam** (*Decision* in Telugu) was built to bridge that gap.
 
-Very few understand **how students learn**, **what they struggle with**, or **how they prefer to be taught.**
+Rather than functioning as another general-purpose chatbot, Nirnayam is designed as an **AI-powered educational companion** that combines intelligent decision-making with adaptive tutoring. Every interaction is personalized using onboarding data, preferred teaching styles, user feedback, and contextual understanding before a response is generated.
 
-**Nirnayam** changes that.
+Whether a student is deciding what to study first, struggling with a difficult concept, or looking for a study strategy before an exam, Nirnayam adapts its guidance to the individual instead of offering a generic answer.
 
-Instead of acting as another chatbot, Nirnayam functions as an intelligent educational companion capable of understanding a student's goals, learning preferences, workload, and previous interactions to deliver highly personalized guidance.
+By combining **Artificial Intelligence**, **dynamic prompt engineering**, **intent routing**, and **continuous personalization**, Nirnayam creates a learning experience that evolves alongside the student rather than remaining static.
 
-Whether a student needs help making an important decision or understanding a difficult concept, Nirnayam adapts its responses to fit the individual rather than providing generic answers.
+Instead of simply answering questions, Nirnayam helps students **learn better, think smarter, and make more confident academic decisions.**
 
 ---
 
@@ -55,750 +56,337 @@ Whether a student needs help making an important decision or understanding a dif
 
 Education has never been more accessible, yet students have never felt more overwhelmed.
 
-Every day, millions of students face an endless stream of decisions—what to study first, how to prepare for upcoming exams, whether to revise concepts or solve practice problems, and how to balance academics with extracurricular activities and personal commitments. These seemingly small choices accumulate into decision fatigue, making it increasingly difficult for students to stay focused, productive, and confident in their learning journey.
+Every day, millions of students face countless academic decisions—what to study first, how long to revise, whether to focus on understanding concepts or solving practice problems, how to balance homework with extracurricular commitments, and how to prepare effectively for upcoming assessments. While each decision may seem small on its own, together they create **decision fatigue**, reducing productivity, increasing stress, and making effective learning significantly more difficult.
 
-While Artificial Intelligence has made remarkable progress, most AI tools are designed as general-purpose assistants. They can answer questions, but they rarely understand *who* the student is, *how* they learn best, or *what* they are trying to achieve. Every learner receives nearly identical responses regardless of their grade level, learning style, academic goals, or previous interactions.
+At the same time, the rapid rise of Artificial Intelligence has changed how students search for information but not necessarily how they learn. Most AI assistants are built as **general-purpose conversational tools**. They generate impressive answers, but they rarely understand the learner behind the question. Every response is typically generated without considering the student's academic level, preferred learning style, educational goals, previous interactions, or the specific context in which they are studying.
 
-Education is not one-size-fits-all.
+Learning, however, is deeply personal.
 
-A student struggling with calculus requires a completely different explanation than someone revising the same topic before an exam. Likewise, a student unsure whether to finish homework, revise for tomorrow's test, or prepare for an upcoming competition needs guidance—not just information.
+A beginner encountering Newton's Laws for the first time requires a completely different explanation than a student revising for a physics examination. Likewise, a student overwhelmed by multiple assignments needs structured decision-making support rather than another lengthy explanation. Generic responses cannot effectively address these diverse learning needs.
 
-Students don't simply need another chatbot.
+Students today don't simply need another chatbot capable of answering questions.
 
-They need an intelligent companion that understands their context, adapts to their preferred learning style, helps them make better academic decisions, and evolves alongside them throughout their educational journey.
+They need an intelligent educational companion that understands their goals, adapts to the way they learn, assists with academic decision-making, and continuously improves through interaction.
 
-This is the challenge Nirnayam was built to solve.
+That is the problem Nirnayam was created to solve.
+
+---
 
 # 💡 Our Solution
 
-Nirnayam (Telugu for **Decision**) was created to bridge the gap between generic AI assistants and truly personalized educational support.
+Nirnayam reimagines how students interact with Artificial Intelligence by placing **personalization** at the center of every conversation.
 
-Instead of acting as another chatbot, Nirnayam combines intelligent decision-making, adaptive tutoring, and personalized learning into a single AI-powered educational companion.
+Instead of relying on a single static prompt, Nirnayam combines multiple intelligent systems—including onboarding-driven personalization, intent classification, dynamic prompt engineering, adaptive teaching styles, and feedback-based learning—to create responses tailored specifically to each learner.
 
-The result is an AI assistant capable of acting as:
+Every interaction begins by understanding **who the student is**, **what they are trying to accomplish**, and **how they prefer to learn**. Rather than generating identical responses for every user, Nirnayam constructs personalized prompts that incorporate the student's profile, preferred teaching methods, previous feedback, and current academic context before sending requests to **Gemini 3.1 Flash Lite**.
 
-- 🎓 Personal Tutor
-- 🧭 Academic Decision Coach
-- 📖 Study Assistant
-- 🧠 Learning Companion
-- 🎯 Productivity Guide
+This enables Nirnayam to function as far more than an AI chatbot.
 
-All within one unified experience.
+It becomes:
+
+- 🧭 An intelligent academic decision-maker that helps students prioritize tasks and reduce decision fatigue.
+- 📚 A personalized tutor capable of adapting explanations to different learning styles.
+- 🎯 A study companion that encourages effective learning strategies rather than simply providing answers.
+- 🧠 An evolving educational assistant that continuously improves through user feedback and personalization.
+
+By combining powerful language models with thoughtful educational design, Nirnayam creates an experience that is not only intelligent, but genuinely student-centered.
 
 ---
 
-# ✨ Key Features
+# ✨ Why Nirnayam?
+
+Most AI assistants focus on answering questions.
+
+Nirnayam focuses on helping students **learn**.
+
+| Feature | Traditional AI Assistants | Nirnayam |
+|-----------|--------------------------|----------|
+| Personalized Teaching Styles | ❌ | ✅ |
+| Student Onboarding | ❌ | ✅ |
+| AI Decision Support | ❌ | ✅ |
+| Dynamic Prompt Engineering | ⚠️ Limited | ✅ |
+| Adaptive Tutoring | ⚠️ Generic | ✅ |
+| Intent-Based Routing | ❌ | ✅ |
+| Continuous Feedback Loop | ❌ | ✅ |
+| Voice Interaction | ⚠️ Limited | ✅ |
+| Student-Centered Experience | ❌ | ✅ |
+
+Instead of acting as another conversational AI, Nirnayam is designed around a simple philosophy:
+
+> **The best AI for education isn't the one that knows the most—it's the one that understands the student the best.**
+
+---
+
+# 🚀 Core Features
+
+Nirnayam is designed around a collection of AI-powered systems that work together to create a personalized educational experience. Rather than relying on a single prompt or static chatbot workflow, every interaction passes through multiple intelligent stages before reaching the student.
+
+---
 
 ## 🧭 AI Decision Engine
 
-Students often struggle deciding what deserves their attention.
+One of Nirnayam's defining features is its ability to help students make informed academic decisions.
 
-Nirnayam analyzes the student's current situation and recommends an optimal course of action rather than leaving them overwhelmed with choices.
+Students often struggle with questions such as:
 
-Examples include:
+- Which assignment should I complete first?
+- Should I revise theory or solve practice questions?
+- How should I prepare for tomorrow's exam?
+- Is it better to finish homework or begin revision?
 
-- Homework prioritization
-- Time management
-- Revision planning
-- Exam preparation
-- Extracurricular balance
-- Productivity guidance
+Instead of simply listing options, Nirnayam evaluates the student's context and provides structured recommendations that reduce decision fatigue and improve productivity.
+
+The goal is not just to answer questions, but to help students build stronger decision-making habits.
 
 ---
 
-## 📚 Intelligent Study Tutor
+## 📚 Adaptive Study Tutor
 
-Beyond simply answering questions, Nirnayam focuses on teaching.
+Learning is most effective when explanations match the learner.
 
-The tutor explains concepts using multiple educational strategies and adjusts explanations depending on student preferences.
+Nirnayam acts as an AI tutor capable of explaining concepts across subjects while adapting its teaching style based on the student's preferences.
 
 Supported teaching approaches include:
 
-- Concept-heavy explanations
-- Problem-solving focused learning
-- Step-by-step guidance
-- Beginner-friendly teaching
-- Real-world analogies
-- Concise explanations
-- Detailed explanations
-- Exam-oriented learning
+- 📖 Concept-Heavy Learning
+- ✏️ Problem-Heavy Learning
+- 🪜 Step-by-Step Explanations
+- 🌍 Real-World Analogies
+- ⚡ Brief & Concise Responses
+- 📚 Detailed Explanations
+- 🎯 Exam-Oriented Preparation
+- 👶 Beginner-Friendly Teaching
+
+Instead of forcing every learner into the same format, Nirnayam dynamically adjusts explanations to maximize understanding.
 
 ---
 
-## 🎨 Personalized Teaching Styles
+## 🎨 Personalized Learning Experience
 
-Every student learns differently.
+During onboarding, students configure how they want Nirnayam to teach them.
 
-During onboarding, students can customize how Nirnayam teaches them.
+These preferences become part of every AI request.
 
 Examples include:
 
-- Use Analogies
-- Brief Responses
-- Concept-Heavy
-- Problem-Heavy
-- Step-by-Step
-- Beginner Friendly
-- Exam Focused
+- Preferred teaching style
+- Academic goals
+- Grade level
+- Learning preferences
 
-These preferences are incorporated directly into the AI prompting system, allowing every response to feel tailored to the learner.
-
----
-
-## 🎙️ Voice Interaction
-
-Students can communicate naturally using voice.
-
-Nirnayam supports:
-
-- 🎤 Voice Input
-- 🔊 Voice Output
-
-making learning significantly more accessible and conversational.
+Rather than generating identical responses for every user, Nirnayam constructs prompts that reflect each student's unique learning profile.
 
 ---
 
 ## 🧠 Intelligent Intent Routing
 
-One of Nirnayam's most powerful features is its custom-built Intent Router.
+Before a response is generated, Nirnayam determines **what the student is actually trying to accomplish.**
 
-Instead of sending every prompt to the same workflow, Nirnayam first determines the student's intent.
+Every prompt passes through an intent classification layer.
 
-```
-
-                 User Prompt
+```text
+               Student Prompt
                       │
           ┌───────────┴───────────┐
           │                       │
-     Study Question?         Decision Request?
+     Study Request          Decision Request
           │                       │
           ▼                       ▼
-   Study Tutor AI         Decision Engine
+    Study Tutor AI         Decision Engine
           │                       │
           └───────────┬───────────┘
                       ▼
            Personalized Response
-
 ```
 
-This routing system ensures that responses are specialized instead of generic, improving both accuracy and educational quality.
+Routing requests before they reach the language model ensures that each prompt follows the most appropriate reasoning pipeline, resulting in more relevant and specialized responses.
 
 ---
 
-## ⭐ Continuous Feedback Loop
+## ⭐ Continuous Personalization
 
-Students can rate AI responses after every interaction.
+Learning does not stop after a single conversation.
 
-This feedback becomes part of Nirnayam's personalization pipeline, allowing future responses to better match user expectations and preferred teaching style.
+Students can rate every AI response, allowing Nirnayam to continuously improve future interactions.
 
-Rather than remaining static, the assistant continually improves its interactions over time.
+This feedback helps the system better understand:
 
----
+- Preferred explanation depth
+- Response quality
+- Teaching effectiveness
+- User satisfaction
 
-## 🔐 Authentication
-
-Users can securely access Nirnayam using:
-
-- Google Authentication
-- Guest Mode
-
-allowing instant access while supporting personalized experiences for signed-in users.
+Over time, Nirnayam becomes increasingly aligned with the individual learner instead of remaining a static assistant.
 
 ---
 
-# ⚙️ How Nirnayam Works
+## 🎤 Voice Interaction
 
-Every interaction follows an intelligent multi-stage pipeline.
+To create a more natural learning experience, Nirnayam supports conversational voice interaction.
 
-```
+Students can:
 
-Student Input
-      │
-      ▼
-Intent Detection
-      │
-      ▼
-Decision / Study Router
-      │
-      ▼
-Personalization Engine
-      │
-      ▼
-Gemini 3.1 Flash Lite
-      │
-      ▼
-Markdown Rendering
-      │
-      ▼
-Voice Output (Optional)
-      │
-      ▼
-User Rating
-      │
-      ▼
-Future Personalization
+- Speak naturally using Voice Input
+- Listen to AI-generated explanations through Voice Output
 
-```
-
-Unlike traditional chatbots, Nirnayam does not rely solely on a single AI prompt.
-
-Instead, it combines routing, personalization, feedback, and prompt engineering to generate responses specifically optimized for each learner.
+These features improve accessibility while making interactions feel more engaging and conversational.
 
 ---
 
-# 🤖 AI & Machine Learning Pipeline
+## 🔐 Authentication & Accessibility
+
+Nirnayam supports multiple access methods to make getting started effortless.
+
+Users can choose between:
+
+- Secure Google Authentication
+- Guest Mode for instant exploration
+
+This allows new users to experience the platform immediately while enabling personalized experiences for returning students.
+
+---
+
+# 🧠 AI & Machine Learning Architecture
 
 Artificial Intelligence is at the heart of Nirnayam.
 
-Every response generated passes through several intelligent stages before reaching the student.
+Rather than relying on a single static prompt, every response follows a structured pipeline designed to maximize personalization, educational quality, and contextual understanding.
 
-### Stage 1 — Context Collection
-
-The system gathers relevant information including:
-
-- User profile
-- Academic preferences
-- Teaching styles
-- Previous ratings
-- Current conversation
-- Prompt intent
-
----
-
-### Stage 2 — Intent Classification
-
-A lightweight routing layer determines whether the student requires:
-
-- Educational assistance
-- Decision making
-- A combination of both
-
-This prevents unnecessary prompting and ensures the AI follows the correct reasoning path.
-
----
-
-### Stage 3 — Dynamic Prompt Engineering
-
-Rather than using a single static prompt, Nirnayam constructs prompts dynamically using:
-
-- Personalized teaching preferences
-- Learning objectives
-- Student context
-- Conversation history
-- Response formatting rules
-
-This significantly improves response quality while maintaining consistency.
-
-# 🧠 Personalization Engine
-
-One of Nirnayam's defining features is its adaptive personalization system.
-
-Rather than generating identical responses for every student, Nirnayam builds a unique learning profile during onboarding and continuously refines it through user interactions.
-
-Every response is influenced by multiple personalization layers.
-
-## 👤 Student Profile
-
-During onboarding, students provide information such as:
-
-- Name
-- Grade / Academic Level
-- Subjects of Interest
-- Learning Goals
-- Preferred Teaching Style
-
-These preferences become part of the AI context and influence every future response.
-
----
-
-## 🎓 Teaching Style Customization
-
-Students can mix multiple teaching styles simultaneously.
-
-Examples include:
-
-- 🧩 Concept-Heavy
-- ✏️ Problem-Heavy
-- 📖 Beginner Friendly
-- 🪜 Step-by-Step
-- ⚡ Brief Explanations
-- 🌍 Real-World Analogies
-- 🎯 Exam Focused
-- 📚 Detailed Learning
-
-Instead of forcing every student into a single learning format, Nirnayam dynamically constructs prompts that combine the selected teaching methods.
-
-This creates explanations that feel natural and individualized.
-
----
-
-## ⭐ Learning From Feedback
-
-Every AI response can be rated.
-
-These ratings become part of the personalization pipeline.
-
-Positive feedback reinforces the current response style.
-
-Lower ratings encourage the AI to adjust future explanations based on user preference.
-
-This enables Nirnayam to become more aligned with each student over time.
-
----
-
-# 🏗 AI System Architecture
-
-The overall AI workflow can be represented as follows:
-
+```text
+                 Student Input
+                        │
+                        ▼
+              User Authentication
+                        │
+                        ▼
+              Student Preferences
+                        │
+                        ▼
+              Intent Classification
+                        │
+          ┌─────────────┴─────────────┐
+          │                           │
+      Study Workflow          Decision Workflow
+          │                           │
+          └─────────────┬─────────────┘
+                        ▼
+            Dynamic Prompt Engineering
+                        │
+                        ▼
+             Gemini 3.1 Flash Lite
+                        │
+                        ▼
+              Markdown Rendering
+                        │
+                        ▼
+              Voice Output (Optional)
+                        │
+                        ▼
+                 User Feedback
+                        │
+                        ▼
+          Continuous Personalization
 ```
 
-                Student
-                    │
-                    ▼
-            User Authentication
-                    │
-        ┌───────────┴───────────┐
-        │                       │
- Google Login             Guest Session
-        │                       │
-        └───────────┬───────────┘
-                    ▼
-             User Preferences
-                    │
-                    ▼
-            Intent Classification
-                    │
-        ┌───────────┴───────────┐
-        │                       │
- Study Assistance        Decision Support
-        │                       │
-        └───────────┬───────────┘
-                    ▼
-         Prompt Personalization
-                    │
-                    ▼
-       Gemini 3.1 Flash Lite API
-                    │
-                    ▼
-          Markdown Formatting
-                    │
-                    ▼
-        Voice Output (Optional)
-                    │
-                    ▼
-          User Feedback & Rating
-                    │
-                    ▼
-      Future Personalization Cycle
+This architecture allows Nirnayam to deliver responses that are context-aware, educational, and personalized rather than generic.
 
-```
-
-Every stage contributes to generating responses that are educational, contextual, and personalized.
+Every stage contributes to producing explanations that better reflect the student's learning style and academic goals.
 
 ---
 
-# 💻 Technology Stack
+# ⚙️ Technology Stack
 
 | Category | Technologies |
 |-----------|--------------|
-| Frontend | React 19, Vite |
-| AI Model | Gemini 3.1 Flash Lite |
-| Authentication | Firebase Authentication |
-| Database | Cloud Firestore |
-| Markdown | React Markdown |
-| Mathematics | KaTeX |
-| Styling | CSS3 |
-| Voice Features | Web Speech API |
-| Deployment | Vercel |
-| Development | Visual Studio Code |
+| **Frontend** | React 19, Vite |
+| **Artificial Intelligence** | Gemini 3.1 Flash Lite |
+| **Authentication** | Firebase Authentication |
+| **Database** | Cloud Firestore |
+| **Markdown Rendering** | React Markdown |
+| **Mathematics** | KaTeX |
+| **Voice Features** | Web Speech API |
+| **Deployment** | Vercel |
+| **Development Environment** | Visual Studio Code |
+
+Each technology was selected with a focus on performance, scalability, and developer experience, enabling Nirnayam to remain responsive while delivering AI-powered educational assistance in real time.
 
 ---
 
-# ☁ Deployment
+# 🎓 Educational Impact
 
-Nirnayam is deployed using **Vercel**, enabling fast global delivery and continuous deployment from GitHub.
+Nirnayam was built with one clear objective:
 
-### Production
+> **To empower students with an AI companion that not only answers questions, but helps them think, learn, and make better academic decisions.**
 
-**Live Application**
+Unlike traditional AI assistants that simply provide information, Nirnayam focuses on creating a personalized learning experience that adapts to each student's unique needs. By combining adaptive tutoring with intelligent decision-making, the platform encourages students to develop stronger study habits, reduce decision fatigue, and approach learning with greater confidence.
 
-https://nirnayam.vercel.app/
+Key educational outcomes include:
 
-**Source Code**
+- 🎯 Personalized learning tailored to individual preferences.
+- 📚 Improved concept understanding through adaptive teaching styles.
+- 🧠 Reduced academic decision fatigue with AI-guided prioritization.
+- 🎤 Increased accessibility through voice interaction.
+- ⭐ Continuous improvement through feedback-driven personalization.
 
-https://github.com/Venky0608/Nirnayam
-
-Deployment benefits include:
-
-- Automatic builds
-- Global CDN
-- HTTPS by default
-- Fast page loads
-- Continuous deployment from GitHub
-
----
-
-# 📂 Project Structure
-
-```
-
-Nirnayam
-│
-├── public/
-│
-├── src/
-│   ├── assets/
-│   ├── components/
-│   ├── pages/
-│   ├── firebase/
-│   ├── styles/
-│   ├── utils/
-│   ├── prompts/
-│   ├── App.jsx
-│   └── main.jsx
-│
-├── package.json
-├── vite.config.js
-└── README.md
-
-```
-
-The project follows a modular structure, allowing components, pages, and utility functions to remain reusable and easy to maintain.
-
----
-
-# ⚡ Core AI Capabilities
-
-Nirnayam combines several AI-powered systems rather than relying on a single chatbot.
-
-## 🧭 Decision Intelligence
-
-Provides structured recommendations for:
-
-- Homework prioritization
-- Time management
-- Productivity
-- Study planning
-- Exam preparation
-
----
-
-## 📚 Educational Assistance
-
-Supports learning across multiple subjects by generating explanations tailored to the student's preferred teaching style.
-
----
-
-## 🧠 Intent Routing
-
-Incoming prompts are classified before reaching the language model.
-
-This enables Nirnayam to determine whether the user requires:
-
-- Decision support
-- Subject tutoring
-- A hybrid response
-
-Routing prompts before generation improves both response quality and efficiency.
-
----
-
-## 🎨 Dynamic Prompt Engineering
-
-Every request sent to Gemini is dynamically generated using:
-
-- Student profile
-- Teaching preferences
-- Previous ratings
-- Current conversation
-- Educational objectives
-- Prompt intent
-
-Rather than relying on one fixed prompt, Nirnayam constructs context-aware prompts that maximize response relevance.
-
----
-
-## 🎙 Voice Interaction
-
-Students can interact naturally using voice.
-
-Features include:
-
-- Speech-to-Text input
-- AI-generated spoken responses
-
-This creates a more conversational and accessible learning experience.
-
----
-
-## 📱 Progressive Web App
-
-Nirnayam is available as an installable Progressive Web App.
-
-Advantages include:
-
-- Cross-platform compatibility
-- Native-like experience
-- Quick startup
-- Responsive interface
-- Easy installation
-
----
-
-# 🎯 Educational Impact
-
-Nirnayam was built with one primary goal:
-
-> **Help students make better decisions and become more effective learners.**
-
-Instead of replacing teachers, Nirnayam acts as a personalized educational companion that encourages critical thinking and structured learning.
-
-Key educational benefits include:
-
-- Personalized explanations
-- Reduced decision fatigue
-- Better study planning
-- Adaptive learning styles
-- Increased accessibility through voice interaction
-- Improved engagement through AI personalization
-
-By combining intelligent decision-making with adaptive tutoring, Nirnayam aims to make high-quality educational support available to every student.
-
----
-
-# 🚀 Why Gemini 3.1 Flash Lite?
-
-Nirnayam is powered by **Gemini 3.1 Flash Lite**, selected for its balance of speed, reasoning ability, and efficiency.
-
-Its capabilities allow Nirnayam to:
-
-- Generate detailed educational explanations
-- Handle structured decision-making tasks
-- Respond with low latency
-- Support long-form reasoning
-- Produce Markdown-formatted educational content
-
-Combined with Nirnayam's personalization layer, Gemini becomes significantly more effective than a generic chatbot by adapting responses to each student's unique learning preferences.
+Rather than replacing teachers or classrooms, Nirnayam is designed to complement them by providing students with guidance whenever they need it.
 
 ---
 
 # 🚧 Challenges Faced
 
-Developing Nirnayam involved tackling several technical and design challenges while balancing performance, usability, and personalization.
+Building Nirnayam involved much more than integrating an AI model.
 
-### 🧠 Designing an Adaptive AI Experience
+One of the biggest challenges was designing an experience that felt genuinely personalized rather than simply conversational. This required combining onboarding preferences, teaching styles, intent detection, and feedback into a single AI workflow while ensuring responses remained fast and relevant.
 
-Creating an assistant that genuinely adapts to different students required much more than simply calling a language model.
+Another challenge was balancing simplicity with functionality. The goal was to create an interface that remained clean and intuitive while still offering powerful AI capabilities such as decision support, adaptive tutoring, voice interaction, and personalized learning.
 
-We needed a system capable of understanding:
-
-- User intent
-- Learning preferences
-- Teaching styles
-- Decision-making scenarios
-- Personalized prompting
-
-Building this pipeline required extensive experimentation with prompt engineering and response structuring.
-
----
-
-### ⚡ Maintaining Fast Response Times
-
-Students expect AI to respond almost instantly.
-
-Balancing rich, personalized responses while maintaining low latency required careful optimization of prompts, context size, and API usage.
-
----
-
-### 🎨 Creating an Intuitive User Experience
-
-One of our biggest goals was making AI feel approachable rather than intimidating.
-
-This meant designing an interface that was:
-
-- Minimal
-- Clean
-- Responsive
-- Easy to navigate
-- Focused on learning rather than distractions
-
-Every screen was refined to reduce cognitive overload and keep students focused on their goals.
-
----
-
-### 📚 Building for Every Type of Learner
-
-No two students learn the same way.
-
-Supporting multiple teaching styles while maintaining consistent educational quality required carefully structured prompts and dynamic response generation.
-
----
-
-# 📖 What I Learned
-
-Building Nirnayam reinforced several important lessons about AI application development.
-
-### 💡 AI is More Than Just a Model
-
-A powerful language model alone does not create a great educational experience.
-
-The surrounding systems—personalization, routing, context management, and user experience—are equally important.
-
----
-
-### 🎯 Personalization Matters
-
-Students respond better when explanations match how they naturally learn.
-
-Even small adjustments to teaching style significantly improve engagement and understanding.
-
----
-
-### ⚙️ Simplicity Creates Better Products
-
-Rather than filling the application with unnecessary features, focusing on solving a single problem exceptionally well resulted in a more polished and enjoyable experience.
-
----
-
-### 🚀 Rapid Iteration Wins
-
-Hackathons reward execution.
-
-Testing ideas quickly, learning from mistakes, and continuously refining the product proved far more valuable than striving for perfection from the beginning.
+These challenges ultimately shaped Nirnayam into a product focused on usability, personalization, and meaningful educational impact.
 
 ---
 
 # 🔮 Future Roadmap
 
-Nirnayam is only the beginning.
+Although Nirnayam already provides personalized tutoring and decision support, several exciting features are planned for future development.
 
-The long-term vision is to transform it into a complete AI-powered learning ecosystem capable of supporting students throughout their educational journey.
+### 🏆 XP & Achievement System
 
-## 📅 Smart Study Planner
-
-Generate adaptive study schedules based on:
-
-- Exams
-- Homework
-- Deadlines
-- Available study time
-- Learning speed
+Students will earn experience points (XP) for completing study sessions, asking questions, maintaining learning streaks, and achieving personal goals. This gamified system is designed to increase motivation and encourage consistent learning habits.
 
 ---
 
-## 📄 AI PDF & Notes Assistant
+### 📅 Google Calendar Integration
 
-Allow students to upload:
-
-- PDFs
-- Textbooks
-- Notes
-- Assignments
-
-Nirnayam will summarize content, explain difficult concepts, generate flashcards, and answer questions directly from uploaded materials.
+Nirnayam will integrate with Google Calendar to automatically organize study schedules, assignment deadlines, exams, and revision sessions. By combining AI recommendations with a student's calendar, the platform can help create more balanced and effective study plans.
 
 ---
 
-## 📊 Learning Analytics Dashboard
+### 📝 Weekly AI Assessments
 
-Provide detailed insights into learning progress, including:
-
-- Strong subjects
-- Weak topics
-- Study consistency
-- Time spent learning
-- Improvement trends
-- Personalized recommendations
-
----
-
-## 🧩 Adaptive Practice Generation
-
-Generate unlimited practice questions tailored to each student's:
-
-- Grade level
-- Subject
-- Difficulty preference
-- Previous performance
-
-Every student receives unique practice sessions that evolve with their progress.
-
----
-
-## 🏆 Gamified Learning
-
-Increase motivation through:
-
-- XP system
-- Daily goals
-- Achievement badges
-- Learning streaks
-- Progress milestones
-
----
-
-## 🤝 Collaborative Learning
-
-Enable students to:
-
-- Form study groups
-- Share notes
-- Discuss concepts
-- Solve problems together with AI assistance
-
----
-
-## 📱 Mobile Applications
-
-Develop native Android and iOS applications for a seamless cross-platform learning experience.
-
----
-
-## 🌍 Multi-Language Support
-
-Expand accessibility by supporting multiple regional and international languages, making personalized education available to a wider audience.
-
----
-
-## 🧠 Long-Term AI Memory
-
-Enable Nirnayam to remember long-term academic goals, learning history, strengths, and areas for improvement to provide increasingly personalized guidance over time.
-
----
-
-# 🌟 Vision
-
-Education should never be one-size-fits-all.
-
-Every student deserves guidance that understands their goals, adapts to their learning style, and empowers them to make confident decisions.
-
-Nirnayam aims to become more than just an AI chatbot.
-
-It strives to become a trusted learning companion that helps students think critically, study effectively, and achieve their full potential.
+Every week, Nirnayam will generate personalized assessments based on the student's recent learning progress and interactions. These assessments will identify strengths, highlight areas for improvement, and recommend focused revision topics, creating a continuous feedback loop for academic growth.
 
 ---
 
 # 🙏 Acknowledgements
 
-This project would not have been possible without the incredible tools and technologies that made rapid AI development possible.
+This project was made possible through the incredible open-source ecosystem and modern AI technologies.
 
 Special thanks to:
 
-- **Google Gemini 3.1 Flash Lite** for powering the AI experience.
+- **Google Gemini 3.1 Flash Lite** for powering the AI capabilities.
+- **React** and **Vite** for enabling a fast and modern frontend.
 - **Firebase** for authentication and cloud services.
-- **React** and **Vite** for providing a fast, modern development framework.
 - **Vercel** for seamless deployment.
-- **KaTeX** and **React Markdown** for rich educational content rendering.
+- **React Markdown** and **KaTeX** for rich educational content rendering.
 - **Visual Studio Code** for the development environment.
-- **Claude** and **ChatGPT** for assisting with development, debugging, brainstorming, and code refinement throughout the project.
+- **Claude** and **ChatGPT** for assisting with brainstorming, debugging, development, documentation, and refining ideas throughout the project.
 
 ---
 
 # 📄 License
 
-This project is released under the **MIT License**.
+This project is licensed under the **MIT License**.
 
-You are welcome to explore, learn from, and build upon this project in accordance with the terms of the license.
+Feel free to explore, learn from, and build upon this project in accordance with the license.
 
 ---
 
@@ -806,18 +394,19 @@ You are welcome to explore, learn from, and build upon this project in accordanc
 
 # ⭐ Thank You for Visiting Nirnayam
 
-### *Helping students make smarter decisions, learn better, and unlock their full potential through Artificial Intelligence.*
+### *Helping students make smarter decisions, learn more effectively, and unlock their full academic potential through Artificial Intelligence.*
 
-**🌐 Live Demo**
+### 🌐 Live Demo
 
-https://nirnayam.vercel.app/
+https://nirnayam.vercel.app/ 
 
-**💻 GitHub Repository**
+### 💻 GitHub Repository
 
 https://github.com/Venky0608/Nirnayam
 
-If you found this project interesting, consider giving it a ⭐ on GitHub!
+If you found Nirnayam interesting, consider giving the repository a ⭐.
 
-Made with ❤️, curiosity, and countless cups of determination.
+**Built with curiosity, innovation, and a passion for making education more personalized through AI.**
 
 </div>
+
