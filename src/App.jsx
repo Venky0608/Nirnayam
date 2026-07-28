@@ -342,7 +342,7 @@ const COMPETITIVE_EXAMS = {
   "Grade 10": COMPETITIVE_EXAMS_ALL,
 };
 
-const STEP_LABELS = ["Subjects", "Goal", "Pressure", "Learning", "About You"];
+const STEP_LABELS = ["Subjects", "Goal", "Pressure", "Learning", "Teaching Style", "About You"];
 
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; });
@@ -468,7 +468,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     grade: "", academicGoal: "", competitiveExam: "", customExam: "",
     stressLevel: 5, timeManagement: 6, deadlineResponse: "",
     priorities: [], optionalSubjects: [], subjectPriority: [],
-    learningStyle: { pace: "", revisionTime: "", distraction: 5, doubtTime: "" },
+    learningStyle: { pace: "", revisionTime: "", distraction: 5, doubtTime: "" }, teachingStyle: [],
     extracurriculars: "", additionalContext: ""
   });
 
@@ -484,6 +484,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     { id: "priority_goal", label: "Goal", question: "Priorities and your goal", subtitle: "Rank your subjects, then tell us what you're working towards", type: "priority_goal" },
     { id: "pressure", label: "Pressure", question: "How do you handle pressure?", subtitle: "Be honest — this calibrates your advice", type: "pressure" },
     { id: "learningStyle", label: "Learning", question: "How do you learn?", subtitle: "Helps Nirnayam give smarter time estimates", type: "learning" },
+    { id: "teachingStyle", label: "Teaching", question: "How should Nirnayam teach you?", subtitle: "Choose as many learning styles as you'd like.", type: "teachingStyle", optional: true },
     { id: "about", label: "About You", question: "Tell us a bit more about you", subtitle: "Optional — the more context, the better the advice", type: "about", optional: true },
   ];
 
@@ -515,15 +516,16 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     });
   };
 
-  const next = () => {
-    if (q.id === "grade_subjects") {
-      setAnswers(a => ({ ...a, subjectPriority: [...compulsory, ...a.optionalSubjects] }));
-    }
-    if (step < QUESTIONS.length - 1) setStep(s => s + 1);
-    else onComplete({ ...answers, stream, allSubjects });
-  };
+  const back = () => {
+    if (step > 0) setStep(s => s - 1);
 
-  const back = () => { if (step > 0) setStep(s => s - 1); };
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+};
+
+  
 
   const handleDragStart = (i) => setDragIdx(i);
   const handleDragOver = (e, i) => {
@@ -727,6 +729,134 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
             </div>
           )}
 
+          {q.type === "teachingStyle" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div>
+                <div
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 14,
+                    color: "#888",
+                    marginBottom: 12
+                  }}
+                >
+                  Choose how you'd like Nirnayam to teach you.
+                  <span style={{ color: "#444" }}> (select as many as you'd like)</span>
+                </div>
+          
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[
+                    {
+                      title: "Use Analogies",
+                      description: "Explain concepts using real-life comparisons."
+                    },
+                    {
+                      title: "Brief & Concise",
+                      description: "Keep explanations short and straight to the point."
+                    },
+                    {
+                      title: "Concept-Heavy",
+                      description: "Focus on deep understanding before solving questions."
+                    },
+                    {
+                      title: "Problem-Heavy",
+                      description: "Learn primarily through solving lots of practice problems."
+                    },
+                    {
+                      title: "Step-by-Step",
+                      description: "Break every solution into clear, sequential steps."
+                    },
+                    {
+                      title: "Visual Thinking",
+                      description: "Describe diagrams, tables, flowcharts and mental images."
+                    },
+                    {
+                      title: "Exam-Focused",
+                      description: "Prioritize board patterns, marks and frequently tested concepts."
+                    },
+                    {
+                      title: "Simple Language",
+                      description: "Avoid jargon and explain everything simply."
+                    },
+                    {
+                      title: "Challenge Me",
+                      description: "Increase difficulty gradually instead of revealing answers immediately."
+                    },
+                    {
+                      title: "Interactive Tutor",
+                      description: "Ask questions often to check my understanding."
+                    },
+                    {
+                      title: "Memory Tricks",
+                      description: "Use mnemonics and recall techniques whenever useful."
+                    },
+                    {
+                      title: "Real-World Applications",
+                      description: "Connect concepts to practical everyday situations."
+                    },
+                    {
+                      title: "Formula First",
+                      description: "Introduce important formulas before explanations."
+                    },
+                    {
+                      title: "Why Before How",
+                      description: "Explain why something works before showing how."
+                    }
+                  ].map(style => {
+                    const selected = (answers.teachingStyle || []).includes(style.title);
+          
+                    return (
+                      <button
+                        key={style.title}
+                        type="button"
+                        onClick={() => {
+                          const current = answers.teachingStyle || [];
+          
+                          setAnswers(a => ({
+                            ...a,
+                            teachingStyle: selected
+                              ? current.filter(x => x !== style.title)
+                              : [...current, style.title]
+                          }));
+                        }}
+                        style={{
+                          ...btnStyle(selected),
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          textAlign: "left",
+                          padding: "16px 18px",
+                          gap: 4
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontFamily: syne,
+                            fontWeight: 700,
+                            fontSize: 17
+                          }}
+                        >
+                          {style.title}
+                        </div>
+          
+                        <div
+                          style={{
+                            fontFamily: mono,
+                            fontSize: 13,
+                            lineHeight: 1.6,
+                            color: selected ? "#333" : "#888"
+                          }}
+                        >
+                          {style.description}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+          
           {q.id === "about" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div>
