@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 import { streamChatResponse } from "./components/StudyChatbot/geminiChatService";
 import ReactMarkdown from "react-markdown";
@@ -487,11 +487,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     { id: "teachingStyle", label: "Teaching", question: "How should Nirnayam teach you?", subtitle: "Choose as many learning styles as you'd like.", type: "teachingStyle", optional: true },
     { id: "about", label: "About You", question: "Tell us a bit more about you", subtitle: "Optional — the more context, the better the advice", type: "about", optional: true },
   ];
-  
-  const streamRef = useRef(null);
-  const optionalSubjectsRef = useRef(null);
-  const examRef = useRef(null);
-  
+
   const q = QUESTIONS[step];
   const isLastStep = step === QUESTIONS.length - 1;
 
@@ -519,14 +515,6 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
       return { ...a, optionalSubjects: newOpt };
     });
   };
-  const scrollToSection = (ref) => {
-    requestAnimationFrame(() => {
-      ref.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    });
-  };
 
   const next = () => {
     if (q.id === "grade_subjects") {
@@ -535,8 +523,7 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
         subjectPriority: [...compulsory, ...a.optionalSubjects]
       }));
     }
-
-    
+  
     if (step < QUESTIONS.length - 1) {
       setStep(s => s + 1);
     } else {
@@ -1065,19 +1052,12 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const bottomRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showSidebar, setShowSidebar] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
-  const [conversations, setConversations] = useState([]);
-  const [currentChatId, setCurrentChatId] = useState(null);
-  const [chatTitle, setChatTitle] = useState("New Chat");
+  const [history, setHistory] = useState([]);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
-  const messagesRef = useRef([]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   useEffect(() => {
     if (textareaRef.current) {
