@@ -1238,7 +1238,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
           {error && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: mono, fontSize: 13, color: "#f87171" }}>{error}</div>}
           {loading && <ResultSkeleton />}
         </>
-      )}
+      
     </div>
   );
 }
