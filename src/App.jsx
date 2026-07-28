@@ -487,7 +487,11 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     { id: "teachingStyle", label: "Teaching", question: "How should Nirnayam teach you?", subtitle: "Choose as many learning styles as you'd like.", type: "teachingStyle", optional: true },
     { id: "about", label: "About You", question: "Tell us a bit more about you", subtitle: "Optional — the more context, the better the advice", type: "about", optional: true },
   ];
-
+  
+  const streamRef = useRef(null);
+  const optionalSubjectsRef = useRef(null);
+  const examRef = useRef(null);
+  
   const q = QUESTIONS[step];
   const isLastStep = step === QUESTIONS.length - 1;
 
@@ -515,6 +519,14 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
       return { ...a, optionalSubjects: newOpt };
     });
   };
+  const scrollToSection = (ref) => {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  };
 
   const next = () => {
     if (q.id === "grade_subjects") {
@@ -523,7 +535,8 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
         subjectPriority: [...compulsory, ...a.optionalSubjects]
       }));
     }
-  
+
+    
     if (step < QUESTIONS.length - 1) {
       setStep(s => s + 1);
     } else {
