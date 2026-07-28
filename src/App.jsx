@@ -1152,17 +1152,33 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
             {personData && personData.total > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· personalised ({personData.total})</span>}
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-         
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
-            <button onClick={() => setShowSettings(true)} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 5 }}>
-              ⚙ settings
+        <div
+    style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    marginBottom: 24
+  }}
+          >
+            <button
+              onClick={() => setShowSettings(true)}
+              style={{
+                background: "transparent",
+                border: "1px solid #1e1e1e",
+                borderRadius: 4,
+                padding: "8px 14px",
+                fontFamily: mono,
+                fontSize: 12,
+                color: "#666",
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+                display: "flex",
+                alignItems: "center",
+                gap: 5
+              }}
+            >
+              ⚙ Settings
             </button>
-            <div style={{ fontFamily: mono, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 4 }}>↑ change profile here</div>
           </div>
-        </div>
-      </div>
-
      
         <>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16 }}>
