@@ -516,6 +516,26 @@ function OnboardingPage({ onComplete, initialAnswers, user }) {
     });
   };
 
+  const next = () => {
+    if (q.id === "grade_subjects") {
+      setAnswers(a => ({
+        ...a,
+        subjectPriority: [...compulsory, ...a.optionalSubjects]
+      }));
+    }
+  
+    if (step < QUESTIONS.length - 1) {
+      setStep(s => s + 1);
+    } else {
+      onComplete({ ...answers, stream, allSubjects });
+    }
+  
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  };
+
   const back = () => {
     if (step > 0) setStep(s => s - 1);
 
