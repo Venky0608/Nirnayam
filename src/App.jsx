@@ -278,6 +278,55 @@ const parsed = JSON.parse(match[0]);
   }
 };
 
+const extractEquationFromImage = async (base64Data, mimeType) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${CHAT_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [
+              { inline_data: { mime_type: mimeType, data: base64Data } },
+              { text: `Extract the question or equation from this image. Rules:
+- Return ONLY the extracted content, nothing else.
+- If it's math, format it as LaTeX wrapped in $$ ... $$ for display equations or $ ... $ for inline symbols.
+- If it's a text question (not math), just return the plain question text.
+- If the image is blurry, unclear, or you're not confident, prefix your answer with "UNCERTAIN: " so the student knows to double check.
+- Do not solve it. Do not explain it. Just extract it exactly as written.` }
+            ]
+          }],
+          generationConfig: { temperature: 0, maxOutputTokens: 500 }
+        })
+      }
+    );
+    clearTimeout(timeout);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("Couldn't read anything from that image.");
+    return text.trim();
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === "AbortError") throw new Error("Image processing timed out. Try again.");
+    throw err;
+  }
+};
+
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(file);
+  });
+};
+
 const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) { onError("Speech recognition is not supported on this browser. Try Chrome."); return null; }
@@ -967,6 +1016,104 @@ function VoiceOutputButton({ result }) {
   );
 }
 
+function ImageEquationButton({ onConfirmed }) {
+  const [extracting, setExtracting] = useState(false);
+  const [error, setError] = useState(null);
+  const [extractedText, setExtractedText] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setExtracting(true);
+    setImagePreviewUrl(URL.createObjectURL(file));
+
+    try {
+      const base64 = await fileToBase64(file);
+      const result = await extractEquationFromImage(base64, file.type);
+      setExtractedText(result);
+    } catch (err) {
+      setError(err.message || "Something went wrong reading that image.");
+    } finally {
+      setExtracting(false);
+      e.target.value = ""; // allows re-selecting the same file later
+    }
+  };
+
+  const reset = () => {
+    setExtractedText(null);
+    setError(null);
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImagePreviewUrl(null);
+  };
+
+  const confirm = () => {
+    const cleaned = extractedText.replace(/^UNCERTAIN:\s*/i, "");
+    onConfirmed(cleaned);
+    reset();
+  };
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={extracting}
+        style={{
+          background: "transparent", border: "1px solid #333", borderRadius: 5,
+          padding: "10px 14px", fontFamily: mono, fontSize: 13,
+          color: extracting ? "#444" : "#666", cursor: extracting ? "not-allowed" : "pointer",
+          WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6
+        }}
+      >
+        <span style={{ fontSize: 16 }}>{extracting ? "⏳" : "📷"}</span>
+        <span>{extracting ? "reading..." : "scan"}</span>
+      </button>
+
+      {(extractedText || error) && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 10, padding: 24, maxWidth: 440, width: "100%" }}>
+            {imagePreviewUrl && (
+              <img src={imagePreviewUrl} alt="scanned" style={{ width: "100%", maxHeight: 180, objectFit: "contain", borderRadius: 6, marginBottom: 16, background: "#000" }} />
+            )}
+
+            {error ? (
+              <>
+                <div style={{ fontFamily: mono, fontSize: 13, color: "#f87171", marginBottom: 16, lineHeight: 1.7 }}>{error}</div>
+                <button onClick={reset} style={{ width: "100%", background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, cursor: "pointer" }}>Try again</button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
+                  {extractedText.startsWith("UNCERTAIN:") ? "⚠ Low confidence — check this" : "Does this look right?"}
+                </div>
+                <textarea
+                  value={extractedText.replace(/^UNCERTAIN:\s*/i, "")}
+                  onChange={(e) => setExtractedText(e.target.value)}
+                  style={{ width: "100%", background: "#080808", border: "1px solid #2a2a2a", borderRadius: 6, color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.7, padding: "12px", resize: "vertical", minHeight: 80, outline: "none", boxSizing: "border-box", marginBottom: 16 }}
+                />
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer" }}>Retake</button>
+                  <button onClick={confirm} style={{ flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, cursor: "pointer" }}>Use this →</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
@@ -1248,6 +1395,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
               style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 100, outline: "none", boxSizing: "border-box" }} />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
               <VoiceInputButton onTranscript={(t) => setInput(prev => prev ? prev + " " + t : t)} onError={(e) => setVoiceError(e)} />
+              <ImageEquationButton onConfirmed={(text) => setInput(prev => prev ? prev + " " + text : text)} />
               <button onClick={handleSend} disabled={loading || !input.trim()} style={{ background: loading || !input.trim() ? "#1a1a1a" : "#fff", color: loading || !input.trim() ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || !input.trim() ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
                 {loading ? "thinking..." : "send →"}
               </button>
