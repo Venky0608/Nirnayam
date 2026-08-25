@@ -67,10 +67,17 @@ Closing note:
  */
 
 export async function streamChatResponse(history, profile, onChunk) {
-  const contents = history.map((m) => ({
+  const contents = history.map((m) => {
+  const parts = [];
+  if (m.image) {
+    parts.push({ inline_data: { mime_type: m.image.mimeType, data: m.image.data } });
+  }
+  parts.push({ text: m.text || "" });
+  return {
     role: m.role === "user" ? "user" : "model",
-    parts: [{ text: m.text }],
-  }));
+    parts,
+  };
+});
 
   const body = {
     system_instruction: {
