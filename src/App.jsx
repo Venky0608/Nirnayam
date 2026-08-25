@@ -1344,7 +1344,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
               </div>
             )}
             <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onPaste={handlePaste} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) {e.preventDefault();if (!loading && (input.trim() || stagedImage)) {handleSend();}}}}
-              placeholder={"Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'\n\nPaste (Ctrl+V) a photo of a question to attach it."}
+              placeholder={"Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'\n\n"}
               style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 100, outline: "none", boxSizing: "border-box" }} />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
