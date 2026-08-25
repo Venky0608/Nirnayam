@@ -147,10 +147,6 @@ const callNirnayam = async (situation, profile, personData) => {
     );
     clearTimeout(timeout);
     const data = await response.json();
-    console.log("ROUTER FULL:", data);
-    console.log("TEXT:", data.candidates?.[0]?.content?.parts?.[0]?.text);
-    console.log("FULL ROUTER RESPONSE:", data);
-    console.log(data);
     if (data.error) throw new Error(data.error.message);
     const text = data.candidates[0].content.parts[0].text;
     const match = text.match(/\{[\s\S]*\}/);
@@ -162,7 +158,7 @@ const callNirnayam = async (situation, profile, personData) => {
     throw err;
   }
 };
-//test
+
 // Uses the CHAT key (not the decision-engine key) — classification runs on
 // every message, so keeping it off the decide key avoids any contention
 // with the core `decide` feature under load.
@@ -248,8 +244,6 @@ ${message}`
     const raw =
       data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 
-    console.log("Router raw:", raw);
-
     const cleaned = raw
   .replace(/```json/g, "")
   .replace(/```/g, "")
@@ -260,8 +254,6 @@ const match = cleaned.match(/\{[\s\S]*\}/);
 if (!match) throw new Error("No JSON");
 
 const parsed = JSON.parse(match[0]);
-
-    console.log("Router:", parsed.route);
 
     if (
       parsed.route === "study" ||
@@ -278,51 +270,21 @@ const parsed = JSON.parse(match[0]);
   }
 };
 
-const extractEquationFromImage = async (base64Data, mimeType) => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${CHAT_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [
-              { inline_data: { mime_type: mimeType, data: base64Data } },
-              { text: `Extract the question or equation from this image. Rules:
-- Return ONLY the extracted content, nothing else.
-- If it's math, format it as LaTeX wrapped in $$ ... $$ for display equations or $ ... $ for inline symbols.
-- If it's a text question (not math), just return the plain question text.
-- If the image is blurry, unclear, or you're not confident, prefix your answer with "UNCERTAIN: " so the student knows to double check.
-- Do not solve it. Do not explain it. Just extract it exactly as written.` }
-            ]
-          }],
-          generationConfig: { temperature: 0, maxOutputTokens: 500 }
-        })
-      }
-    );
-    clearTimeout(timeout);
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Couldn't read anything from that image.");
-    return text.trim();
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err.name === "AbortError") throw new Error("Image processing timed out. Try again.");
-    throw err;
-  }
-};
-
-const fileToBase64 = (file) => {
+// Reads a File into { mimeType, data (base64, no prefix), dataUrl (for <img> preview) }.
+// Used for both file-picker uploads and clipboard-pasted images.
+const readImageFile = (file) => {
   return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("That doesn't look like an image."));
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const base64 = dataUrl.split(",")[1];
+      resolve({ mimeType: file.type, data: base64, dataUrl });
+    };
+    reader.onerror = () => reject(new Error("Couldn't read that image."));
     reader.readAsDataURL(file);
   });
 };
@@ -1016,104 +978,6 @@ function VoiceOutputButton({ result }) {
   );
 }
 
-function ImageEquationButton({ onConfirmed }) {
-  const [extracting, setExtracting] = useState(false);
-  const [error, setError] = useState(null);
-  const [extractedText, setExtractedText] = useState(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
-  const fileInputRef = useRef(null);
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError(null);
-    setExtracting(true);
-    setImagePreviewUrl(URL.createObjectURL(file));
-
-    try {
-      const base64 = await fileToBase64(file);
-      const result = await extractEquationFromImage(base64, file.type);
-      setExtractedText(result);
-    } catch (err) {
-      setError(err.message || "Something went wrong reading that image.");
-    } finally {
-      setExtracting(false);
-      e.target.value = ""; // allows re-selecting the same file later
-    }
-  };
-
-  const reset = () => {
-    setExtractedText(null);
-    setError(null);
-    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
-    setImagePreviewUrl(null);
-  };
-
-  const confirm = () => {
-    const cleaned = extractedText.replace(/^UNCERTAIN:\s*/i, "");
-    onConfirmed(cleaned);
-    reset();
-  };
-
-  return (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={extracting}
-        style={{
-          background: "transparent", border: "1px solid #333", borderRadius: 5,
-          padding: "10px 14px", fontFamily: mono, fontSize: 13,
-          color: extracting ? "#444" : "#666", cursor: extracting ? "not-allowed" : "pointer",
-          WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6
-        }}
-      >
-        <span style={{ fontSize: 16 }}>{extracting ? "⏳" : "📷"}</span>
-        <span>{extracting ? "reading..." : "scan"}</span>
-      </button>
-
-      {(extractedText || error) && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 10, padding: 24, maxWidth: 440, width: "100%" }}>
-            {imagePreviewUrl && (
-              <img src={imagePreviewUrl} alt="scanned" style={{ width: "100%", maxHeight: 180, objectFit: "contain", borderRadius: 6, marginBottom: 16, background: "#000" }} />
-            )}
-
-            {error ? (
-              <>
-                <div style={{ fontFamily: mono, fontSize: 13, color: "#f87171", marginBottom: 16, lineHeight: 1.7 }}>{error}</div>
-                <button onClick={reset} style={{ width: "100%", background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, cursor: "pointer" }}>Try again</button>
-              </>
-            ) : (
-              <>
-                <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
-                  {extractedText.startsWith("UNCERTAIN:") ? "⚠ Low confidence — check this" : "Does this look right?"}
-                </div>
-                <textarea
-                  value={extractedText.replace(/^UNCERTAIN:\s*/i, "")}
-                  onChange={(e) => setExtractedText(e.target.value)}
-                  style={{ width: "100%", background: "#080808", border: "1px solid #2a2a2a", borderRadius: 6, color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.7, padding: "12px", resize: "vertical", minHeight: 80, outline: "none", boxSizing: "border-box", marginBottom: 16 }}
-                />
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button onClick={reset} style={{ flex: 1, background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer" }}>Retake</button>
-                  <button onClick={confirm} style={{ flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, cursor: "pointer" }}>Use this →</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
 function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
@@ -1195,7 +1059,7 @@ function ResultSkeleton() {
 
 function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, result?, situation? }
+  const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, image?, result?, situation? }
   const bottomRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -1203,6 +1067,11 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const [voiceError, setVoiceError] = useState(null);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
+
+  // Staged image: attached (via paste or file picker) but not yet sent.
+  const [stagedImage, setStagedImage] = useState(null); // { mimeType, data, dataUrl }
+  const [attachError, setAttachError] = useState(null);
+  const imageInputRef = useRef(null);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -1218,36 +1087,93 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
     });
   }, [messages, loading]);
 
+  const handlePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+        try {
+          const img = await readImageFile(file);
+          setStagedImage(img);
+          setAttachError(null);
+        } catch (err) {
+          setAttachError(err.message);
+        }
+        break;
+      }
+    }
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const img = await readImageFile(file);
+      setStagedImage(img);
+      setAttachError(null);
+    } catch (err) {
+      setAttachError(err.message);
+    }
+    e.target.value = "";
+  };
+
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || loading) return;
+    if ((!trimmed && !stagedImage) || loading) return;
 
     setError(null);
-    setMessages(prev => [...prev, { role: "user", text: trimmed }]);
+    const userMsg = { role: "user", text: trimmed, image: stagedImage || undefined };
+    const fullHistory = [...messages, userMsg];
+
+    setMessages(prev => [...prev, userMsg]);
     setInput("");
+    const imageForThisSend = stagedImage;
+    setStagedImage(null);
     setLoading(true);
 
     try {
-      const intent = await classifyIntent(trimmed);
-      console.log("Intent:", intent);
+      // Images always go to the study/tutor chat — the decision engine can't read images.
+      const intent = imageForThisSend ? "study" : await classifyIntent(trimmed);
 
-      if (intent === "decision" || intent === "both") {
+      if (!imageForThisSend && (intent === "decision" || intent === "both")) {
         const res = await callNirnayam(trimmed, profile, personData);
         setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation: trimmed }]);
-        
       }
 
-      if (intent === "study" || intent === "both") {
+      if (imageForThisSend || intent === "study" || intent === "both") {
+        // Only chat turns (user messages + assistant chat replies) count as conversation
+        // memory — decision-engine turns are structured JSON, not useful chat context.
+        const chatOnly = fullHistory.filter(m => m.role === "user" || m.kind === "chat").slice(-20);
+
+        // Only resend actual image bytes for the most recent image in the window —
+        // older images become a text note so we don't re-pay token cost every turn.
+        let lastImageIdx = -1;
+        chatOnly.forEach((m, i) => { if (m.image) lastImageIdx = i; });
+
+        const chatHistory = chatOnly.map((m, i) => ({
+          role: m.role,
+          text: m.image && i !== lastImageIdx
+            ? `${m.text ? m.text + " " : ""}[an image was shared earlier in this conversation]`
+            : (m.text || ""),
+          image: (m.image && i === lastImageIdx)
+            ? { mimeType: m.image.mimeType, data: m.image.data }
+            : undefined,
+        }));
+
         setMessages(prev => [...prev, { role: "assistant", kind: "chat", text: "" }]);
         let accumulated = "";
         await streamChatResponse(
-          [{ role: "user", text: trimmed }],
+          chatHistory,
           {
             grade: profile.grade,
             stream: profile.stream || "",
             examTarget: profile.competitiveExam === "Other"
               ? (profile.customExam || "competitive exam")
               : (profile.competitiveExam || profile.academicGoal || "board exams"),
+            teachingStyle: profile.teachingStyle || [],
           },
           (chunk) => {
             accumulated += chunk;
@@ -1333,8 +1259,15 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
             {messages.map((m, i) => {
               if (m.role === "user") {
                 return (
-                  <div key={i} style={{ alignSelf: "flex-end", maxWidth: "80%", background: "#fff", color: "#000", borderRadius: 8, padding: "10px 14px", fontFamily: mono, fontSize: 14, lineHeight: 1.6 }}>
-                    {m.text}
+                  <div key={i} style={{ alignSelf: "flex-end", maxWidth: "80%", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                    {m.image && (
+                      <img src={m.image.dataUrl} alt="attached" style={{ maxWidth: 220, borderRadius: 8, border: "1px solid #2a2a2a" }} />
+                    )}
+                    {m.text && (
+                      <div style={{ background: "#fff", color: "#000", borderRadius: 8, padding: "10px 14px", fontFamily: mono, fontSize: 14, lineHeight: 1.6 }}>
+                        {m.text}
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -1390,17 +1323,41 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
 
           
           <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, marginBottom: 16, overflow: "hidden" }}>
-            <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) {e.preventDefault();if (!loading && input.trim()) {handleSend();}}}}
-              placeholder={"Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'"}
+            {stagedImage && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderBottom: "1px solid #111" }}>
+                <img src={stagedImage.dataUrl} alt="attached" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 5, border: "1px solid #2a2a2a" }} />
+                <span style={{ fontFamily: mono, fontSize: 12, color: "#666", flex: 1 }}>Image attached — add a note or just hit send</span>
+                <button onClick={() => setStagedImage(null)} style={{ background: "transparent", border: "none", color: "#f87171", fontFamily: mono, fontSize: 16, cursor: "pointer" }}>✕</button>
+              </div>
+            )}
+            <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onPaste={handlePaste} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) {e.preventDefault();if (!loading && (input.trim() || stagedImage)) {handleSend();}}}}
+              placeholder={"Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'\n\nPaste (Ctrl+V) a photo of a question to attach it."}
               style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 100, outline: "none", boxSizing: "border-box" }} />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
-              <VoiceInputButton onTranscript={(t) => setInput(prev => prev ? prev + " " + t : t)} onError={(e) => setVoiceError(e)} />
-              <ImageEquationButton onConfirmed={(text) => setInput(prev => prev ? prev + " " + text : text)} />
-              <button onClick={handleSend} disabled={loading || !input.trim()} style={{ background: loading || !input.trim() ? "#1a1a1a" : "#fff", color: loading || !input.trim() ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || !input.trim() ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <VoiceInputButton onTranscript={(t) => setInput(prev => prev ? prev + " " + t : t)} onError={(e) => setVoiceError(e)} />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: "none" }}
+                  onChange={handleFileSelect}
+                />
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  style={{ background: "transparent", border: "1px solid #333", borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <span style={{ fontSize: 16 }}>📷</span>
+                  <span>attach</span>
+                </button>
+              </div>
+              <button onClick={handleSend} disabled={loading || (!input.trim() && !stagedImage)} style={{ background: loading || (!input.trim() && !stagedImage) ? "#1a1a1a" : "#fff", color: loading || (!input.trim() && !stagedImage) ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || (!input.trim() && !stagedImage) ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
                 {loading ? "thinking..." : "send →"}
               </button>
             </div>
           </div>
+          {attachError && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "10px 14px", fontFamily: mono, fontSize: 12, color: "#f87171", marginBottom: 10 }}>{attachError}</div>}
           {voiceError && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "10px 14px", fontFamily: mono, fontSize: 12, color: "#f87171", marginBottom: 10 }}>{voiceError}</div>}
           {error && <div style={{ background: "#1a0a0a", border: "1px solid #2a1010", borderRadius: 6, padding: "14px 18px", fontFamily: mono, fontSize: 13, color: "#f87171" }}>{error}</div>}
           {loading && <ResultSkeleton />}
