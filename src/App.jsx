@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-<<<<<<< HEAD
 import { Mic, Volume2, Square, Camera } from "lucide-react";
-=======
->>>>>>> 2a1c0cfcfc15a038957d044442d99935fcda71da
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
@@ -957,7 +954,6 @@ function VoiceInputButton({ onTranscript, onError }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <button onClick={toggle} style={{ background: listening ? "#f87171" : "transparent", border: `1px solid ${listening ? "#f87171" : "#333"}`, borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: listening ? "#000" : "#666", cursor: "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6, animation: listening ? "pulse 1s ease-in-out infinite" : "none" }}>
-<<<<<<< HEAD
          <span style={{ display: "flex", alignItems: "center" }}>
   {listening ? (
     <Square size={14} strokeWidth={1.8} />
@@ -965,9 +961,6 @@ function VoiceInputButton({ onTranscript, onError }) {
     <Mic size={16} strokeWidth={1.8} />
   )}
 </span>
-=======
-        <span style={{ fontSize: 16 }}>{listening ? "⏹" : "🎙"}</span>
->>>>>>> 2a1c0cfcfc15a038957d044442d99935fcda71da
         <span>{listening ? "listening..." : "speak"}</span>
       </button>
       {interimText && <div style={{ fontFamily: mono, fontSize: 11, color: "#555", fontStyle: "italic", paddingLeft: 2 }}>"{interimText}"</div>}
@@ -985,7 +978,6 @@ function VoiceOutputButton({ result }) {
   };
   if (!window.speechSynthesis) return null;
   return (
-<<<<<<< HEAD
     <button onClick={toggle} style={{ background: speaking ? "#4ade80" : "transparent", border: `1px solid ${speaking ? "#4ade80" : "#2a2a2a"}`, borderRadius: 4, padding: "6px 12px", fontFamily: mono, fontSize: 12, color: speaking ? "#000" : "#8A8A8A", cursor: "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6 }}>
       <span style={{ display: "flex", alignItems: "center" }}>
   {speaking ? (
@@ -994,10 +986,6 @@ function VoiceOutputButton({ result }) {
     <Volume2 size={15} strokeWidth={1.8} />
   )}
 </span>
-=======
-    <button onClick={toggle} style={{ background: speaking ? "#4ade80" : "transparent", border: `1px solid ${speaking ? "#4ade80" : "#2a2a2a"}`, borderRadius: 4, padding: "6px 12px", fontFamily: mono, fontSize: 12, color: speaking ? "#000" : "#555", cursor: "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6 }}>
-      <span>{speaking ? "⏹" : "🔊"}</span>
->>>>>>> 2a1c0cfcfc15a038957d044442d99935fcda71da
       <span>{speaking ? "stop" : "listen to advice"}</span>
     </button>
   );
@@ -1371,17 +1359,11 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                 />
                 <button
                   onClick={() => imageInputRef.current?.click()}
-<<<<<<< HEAD
                   style={{ background: "transparent", border: "1px solid #8A8A8A", borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6 }}
                 >
                   <span style={{ display: "flex", alignItems: "center" }}>
   <Camera size={16} strokeWidth={1.8} />
 </span>
-=======
-                  style={{ background: "transparent", border: "1px solid #333", borderRadius: 5, padding: "10px 14px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <span style={{ fontSize: 16 }}>📷</span>
->>>>>>> 2a1c0cfcfc15a038957d044442d99935fcda71da
                   <span>attach</span>
                 </button>
               </div>
