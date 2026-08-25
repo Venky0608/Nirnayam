@@ -86,7 +86,7 @@ export async function streamChatResponse(history, profile, onChunk) {
     contents,
     generationConfig: {
       temperature: 0.5,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
     },
   };
 
