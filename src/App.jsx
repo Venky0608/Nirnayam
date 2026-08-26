@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, Volume2, Square, Camera } from "lucide-react";
+import { Mic, Volume2, Square, Camera, Calendar, Trash2 } from "lucide-react";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
 import { streamChatResponse } from "./components/StudyChatbot/geminiChatService";
 import ReactMarkdown from "react-markdown";
@@ -288,6 +288,69 @@ const readImageFile = (file) => {
     reader.onerror = () => reject(new Error("Couldn't read that image."));
     reader.readAsDataURL(file);
   });
+};
+
+// ---------- Planner + XP ----------
+// 20 XP per completed task, 200 XP per level, capped at level 25 — reuses the
+// curve from Venky's standalone summer planner app.
+const XP_PER_TASK = 20;
+const XP_PER_LEVEL = 200;
+const MAX_LEVEL = 25;
+const levelFromXP = (total) => Math.min(MAX_LEVEL, Math.floor(total / XP_PER_LEVEL) + 1);
+
+// Local (not UTC) date string, so "today" doesn't flip early for IST users.
+const getLocalDateStr = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const loadXP = async (uid) => {
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    return (snap.exists() && snap.data().xp) || { total: 0, level: 1 };
+  } catch { return { total: 0, level: 1 }; }
+};
+
+const loadPlannerTasks = async (uid) => {
+  try {
+    const q = query(collection(db, "users", uid, "plannerTasks"), orderBy("createdAt", "asc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+};
+
+const addPlannerTask = async (uid, text, date, source = "manual") => {
+  const payload = { text, date, done: false, xpAwarded: false, source, createdAt: new Date().toISOString() };
+  const ref = await addDoc(collection(db, "users", uid, "plannerTasks"), payload);
+  return { id: ref.id, ...payload };
+};
+
+// Marks a task done/undone. Only the FIRST time a task is marked done does it
+// award XP (guarded by xpAwarded) — unchecking it later never claws XP back,
+// but re-checking it also never re-awards, so toggling can't be farmed.
+const togglePlannerTask = async (uid, task, newDone) => {
+  const taskRef = doc(db, "users", uid, "plannerTasks", task.id);
+  let xpAwarded = task.xpAwarded;
+  let xp = null;
+
+  if (newDone && !task.xpAwarded) {
+    const userRef = doc(db, "users", uid);
+    const snap = await getDoc(userRef);
+    const currentTotal = (snap.exists() && snap.data().xp?.total) || 0;
+    const newTotal = currentTotal + XP_PER_TASK;
+    xp = { total: newTotal, level: levelFromXP(newTotal) };
+    await setDoc(userRef, { xp }, { merge: true });
+    xpAwarded = true;
+  }
+
+  await updateDoc(taskRef, { done: newDone, xpAwarded });
+  return { xpAwarded, xp };
+};
+
+const deletePlannerTask = async (uid, taskId) => {
+  await deleteDoc(doc(db, "users", uid, "plannerTasks", taskId));
 };
 
 const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
@@ -1070,6 +1133,143 @@ function ResultSkeleton() {
   );
 }
 
+function PlannerPage({ user, onBack, onGoogleSignIn }) {
+  const [tasks, setTasks] = useState([]);
+  const [xp, setXp] = useState({ total: 0, level: 1 });
+  const [newTask, setNewTask] = useState("");
+  const [loadingTasks, setLoadingTasks] = useState(true);
+  const today = getLocalDateStr();
+
+  useEffect(() => {
+    if (!user) { setLoadingTasks(false); return; }
+    (async () => {
+      try {
+        const [allTasks, xpData] = await Promise.all([loadPlannerTasks(user.uid), loadXP(user.uid)]);
+        setTasks(allTasks.filter(t => t.date === today));
+        setXp(xpData);
+      } catch (e) { console.error(e); }
+      finally { setLoadingTasks(false); }
+    })();
+  }, [user]);
+
+  const handleAdd = async () => {
+    const text = newTask.trim();
+    if (!text || !user) return;
+    setNewTask("");
+    try {
+      const task = await addPlannerTask(user.uid, text, today);
+      setTasks(prev => [...prev, task]);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleToggle = async (task) => {
+    if (!user) return;
+    const newDone = !task.done;
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: newDone } : t));
+    try {
+      const { xpAwarded, xp: newXp } = await togglePlannerTask(user.uid, task, newDone);
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, xpAwarded } : t));
+      if (newXp) setXp(newXp);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDelete = async (taskId) => {
+    if (!user) return;
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    try { await deletePlannerTask(user.uid, taskId); } catch (e) { console.error(e); }
+  };
+
+  const xpIntoLevel = xp.total % XP_PER_LEVEL;
+  const xpProgressPct = xp.level >= MAX_LEVEL ? 100 : (xpIntoLevel / XP_PER_LEVEL) * 100;
+  const doneCount = tasks.filter(t => t.done).length;
+
+  if (!user) {
+    return (
+      <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
+        <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 32 }}>Daily Planner</div>
+        <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", textAlign: "center" }}>
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#aaa", marginBottom: 16, lineHeight: 1.7 }}>
+            Sign in to use the planner.<br />
+            <span style={{ color: "#666", fontSize: 12 }}>Tasks and XP are saved to your account.</span>
+          </div>
+          <button onClick={onGoogleSignIn} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 4, padding: "10px 24px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Sign in with Google</button>
+        </div>
+        <button onClick={onBack} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "10px 20px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "block", margin: "28px auto 0" }}>← Back</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
+      <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Daily Planner</div>
+      <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28 }}>
+        {new Date().toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric" })}
+      </div>
+
+      <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase" }}>Level {xp.level}</span>
+          <span style={{ fontFamily: mono, fontSize: 12, color: "#666" }}>{xp.total} XP total</span>
+        </div>
+        <div style={{ height: 8, borderRadius: 4, background: "#1a1a1a", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${xpProgressPct}%`, background: "#4ade80", transition: "width 0.5s ease" }} />
+        </div>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", marginTop: 8 }}>
+          {xp.level >= MAX_LEVEL ? "Max level reached 🎉" : `${xpIntoLevel} / ${XP_PER_LEVEL} XP to level ${xp.level + 1}`}
+        </div>
+      </div>
+
+      <div style={{ fontFamily: mono, fontSize: 12, color: "#666", marginBottom: 12 }}>
+        {doneCount}/{tasks.length} done today
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <input
+          type="text"
+          value={newTask}
+          onChange={e => setNewTask(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
+          placeholder="Add a task for today..."
+          style={{ flex: 1, background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 5, color: "#ddd", fontFamily: mono, fontSize: 14, padding: "12px 14px", outline: "none", boxSizing: "border-box" }}
+        />
+        <button onClick={handleAdd} disabled={!newTask.trim()} style={{ background: newTask.trim() ? "#fff" : "#1a1a1a", color: newTask.trim() ? "#000" : "#333", border: "none", borderRadius: 5, padding: "12px 20px", fontFamily: mono, fontSize: 13, cursor: newTask.trim() ? "pointer" : "not-allowed", WebkitTapHighlightColor: "transparent" }}>
+          Add
+        </button>
+      </div>
+
+      {loadingTasks ? (
+        <div style={{ fontFamily: mono, fontSize: 13, color: "#444", textAlign: "center", padding: "20px 0" }}>Loading...</div>
+      ) : tasks.length === 0 ? (
+        <div style={{ fontFamily: mono, fontSize: 13, color: "#444", textAlign: "center", padding: "20px 0" }}>Nothing planned yet — add your first task above.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+          {tasks.map(task => (
+            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 6 }}>
+              <button
+                onClick={() => handleToggle(task)}
+                style={{ width: 20, height: 20, flexShrink: 0, borderRadius: 4, border: `1.5px solid ${task.done ? "#4ade80" : "#3a3a3a"}`, background: task.done ? "#4ade80" : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, WebkitTapHighlightColor: "transparent" }}
+              >
+                {task.done && <span style={{ color: "#000", fontSize: 13, fontWeight: 700 }}>✓</span>}
+              </button>
+              <span style={{ flex: 1, fontFamily: mono, fontSize: 14, color: task.done ? "#555" : "#ddd", textDecoration: task.done ? "line-through" : "none" }}>
+                {task.text}
+              </span>
+              {task.source === "decision-engine" && (
+                <span style={{ fontFamily: mono, fontSize: 10, color: "#4ade80", border: "1px solid #4ade8040", borderRadius: 3, padding: "2px 6px", flexShrink: 0 }}>auto</span>
+              )}
+              <button onClick={() => handleDelete(task.id)} style={{ background: "transparent", border: "none", color: "#555", cursor: "pointer", padding: 4, display: "flex", WebkitTapHighlightColor: "transparent", flexShrink: 0 }}>
+                <Trash2 size={14} strokeWidth={1.8} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button onClick={onBack} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "10px 20px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "block", margin: "0 auto" }}>← Back</button>
+    </div>
+  );
+}
+
 function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, image?, result?, situation? }
@@ -1077,6 +1277,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPlanner, setShowPlanner] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
@@ -1211,6 +1412,10 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
       onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />
   );
 
+  if (showPlanner) return (
+    <PlannerPage user={user} onGoogleSignIn={onGoogleSignIn} onBack={() => setShowPlanner(false)} />
+  );
+
 
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 950, margin: "0 auto" }}>
@@ -1242,9 +1447,30 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
     style={{
     display: "flex",
     justifyContent: "flex-end",
+    gap: 8,
     marginBottom: 24
   }}
           >
+            <button
+              onClick={() => setShowPlanner(true)}
+              style={{
+                background: "transparent",
+                border: "1px solid #1e1e1e",
+                borderRadius: 4,
+                padding: "8px 14px",
+                fontFamily: mono,
+                fontSize: 12,
+                color: "#666",
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+                display: "flex",
+                alignItems: "center",
+                gap: 5
+              }}
+            >
+              <Calendar size={14} strokeWidth={1.8} />
+              Planner
+            </button>
             <button
               onClick={() => setShowSettings(true)}
               style={{
