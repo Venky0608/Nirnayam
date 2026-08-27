@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, Volume2, Square, Camera, Calendar, Trash2 } from "lucide-react";
+import { Mic, Volume2, Square, Camera, Calendar, Trash2, Trophy, Sparkles } from "lucide-react";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
@@ -290,13 +290,60 @@ const readImageFile = (file) => {
   });
 };
 
-// ---------- Planner + XP ----------
-// 20 XP per completed task, 200 XP per level, capped at level 25 — reuses the
-// curve from Venky's standalone summer planner app.
-const XP_PER_TASK = 20;
+// ---------- Planner + XP + Rebirth ----------
 const XP_PER_LEVEL = 200;
-const MAX_LEVEL = 25;
-const levelFromXP = (total) => Math.min(MAX_LEVEL, Math.floor(total / XP_PER_LEVEL) + 1);
+const MAX_LEVEL = 50;
+const BASE_XP_PER_TASK = 20;
+const XP_PER_TASK_INCREMENT = 10;
+
+const xpPerTask = (rebirths) => BASE_XP_PER_TASK + rebirths * XP_PER_TASK_INCREMENT;
+const levelFromCycleXP = (cycleXP) => Math.min(MAX_LEVEL, Math.floor(cycleXP / XP_PER_LEVEL) + 1);
+
+const TITLE_CARDS = [
+  { level: 1, title: "Wanderer" }, { level: 2, title: "First Step" }, { level: 3, title: "Early Riser" },
+  { level: 4, title: "Note-Taker" }, { level: 5, title: "Focus Finder" }, { level: 6, title: "Steady Hand" },
+  { level: 7, title: "Habit Builder" }, { level: 8, title: "Quiet Grinder" }, { level: 9, title: "Consistent" },
+  { level: 10, title: "Compass Bearer" }, { level: 11, title: "Task Tamer" }, { level: 12, title: "Small Wins" },
+  { level: 13, title: "On Track" }, { level: 14, title: "Momentum" }, { level: 15, title: "Direction Setter" },
+  { level: 16, title: "Grounded" }, { level: 17, title: "Clarity Seeker" }, { level: 18, title: "Even Keel" },
+  { level: 19, title: "Purposeful" }, { level: 20, title: "Way-Finder" }, { level: 21, title: "Resolute" },
+  { level: 22, title: "Sharp Focus" }, { level: 23, title: "Trailblazer" }, { level: 24, title: "Anchor Point" },
+  { level: 25, title: "Halfway Beacon" }, { level: 26, title: "Pathbreaker" }, { level: 27, title: "Steadfast" },
+  { level: 28, title: "Clear-Eyed" }, { level: 29, title: "Unshaken" }, { level: 30, title: "Precision Mind" },
+  { level: 31, title: "Deep Worker" }, { level: 32, title: "Momentum Keeper" }, { level: 33, title: "Calibrated" },
+  { level: 34, title: "Relentless" }, { level: 35, title: "Iron Focus" }, { level: 36, title: "Vision Holder" },
+  { level: 37, title: "Sharp Mind" }, { level: 38, title: "Disciplined" }, { level: 39, title: "Unrelenting" },
+  { level: 40, title: "True North" }, { level: 41, title: "Master Planner" }, { level: 42, title: "Decision Maker" },
+  { level: 43, title: "Sharpshooter" }, { level: 44, title: "Strategist" }, { level: 45, title: "Architect of Days" },
+  { level: 46, title: "Vanguard" }, { level: 47, title: "Sage" }, { level: 48, title: "Luminary" },
+  { level: 49, title: "Paragon" }, { level: 50, title: "Nirnayam" },
+];
+const getTitleForLevel = (level) => (TITLE_CARDS.find(t => t.level === level) || TITLE_CARDS[0]).title;
+
+const toRoman = (num) => {
+  if (num <= 0) return "";
+  const vals = [[10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  let res = "", n = num;
+  for (const [v, s] of vals) { while (n >= v) { res += s; n -= v; } }
+  return res;
+};
+const displayTitle = (xp) => `${xp.rebirths > 0 ? `Rebirth ${toRoman(xp.rebirths)} \u00b7 ` : ""}${getTitleForLevel(xp.level)}`;
+
+// Normalizes whatever is stored in Firestore's users/{uid}.xp into the current
+// shape — handles the earlier {total, level} shape from before rebirths existed.
+const normalizeXP = (raw) => {
+  if (!raw) return { cycleXP: 0, level: 1, rebirths: 0, lifetimeXP: 0 };
+  if (raw.cycleXP !== undefined) {
+    return { cycleXP: raw.cycleXP, level: raw.level || 1, rebirths: raw.rebirths || 0, lifetimeXP: raw.lifetimeXP ?? raw.cycleXP };
+  }
+  const legacyTotal = raw.total || 0;
+  return {
+    cycleXP: Math.min(legacyTotal, (MAX_LEVEL - 1) * XP_PER_LEVEL + (XP_PER_LEVEL - 1)),
+    level: Math.min(MAX_LEVEL, Math.floor(legacyTotal / XP_PER_LEVEL) + 1),
+    rebirths: 0,
+    lifetimeXP: legacyTotal,
+  };
+};
 
 // Local (not UTC) date string, so "today" doesn't flip early for IST users.
 const getLocalDateStr = (d = new Date()) => {
@@ -309,8 +356,8 @@ const getLocalDateStr = (d = new Date()) => {
 const loadXP = async (uid) => {
   try {
     const snap = await getDoc(doc(db, "users", uid));
-    return (snap.exists() && snap.data().xp) || { total: 0, level: 1 };
-  } catch { return { total: 0, level: 1 }; }
+    return normalizeXP(snap.exists() ? snap.data().xp : null);
+  } catch { return normalizeXP(null); }
 };
 
 const loadPlannerTasks = async (uid) => {
@@ -329,7 +376,9 @@ const addPlannerTask = async (uid, text, date, source = "manual") => {
 
 // Marks a task done/undone. Only the FIRST time a task is marked done does it
 // award XP (guarded by xpAwarded) — unchecking it later never claws XP back,
-// but re-checking it also never re-awards, so toggling can't be farmed.
+// and re-checking it never re-awards, so toggling can't be farmed. No XP is
+// granted once a cycle is maxed at level 50 — the student has to rebirth to
+// keep earning.
 const togglePlannerTask = async (uid, task, newDone) => {
   const taskRef = doc(db, "users", uid, "plannerTasks", task.id);
   let xpAwarded = task.xpAwarded;
@@ -338,10 +387,16 @@ const togglePlannerTask = async (uid, task, newDone) => {
   if (newDone && !task.xpAwarded) {
     const userRef = doc(db, "users", uid);
     const snap = await getDoc(userRef);
-    const currentTotal = (snap.exists() && snap.data().xp?.total) || 0;
-    const newTotal = currentTotal + XP_PER_TASK;
-    xp = { total: newTotal, level: levelFromXP(newTotal) };
-    await setDoc(userRef, { xp }, { merge: true });
+    const current = normalizeXP(snap.exists() ? snap.data().xp : null);
+
+    if (current.level < MAX_LEVEL) {
+      const gain = xpPerTask(current.rebirths);
+      const newCycleXP = current.cycleXP + gain;
+      xp = { cycleXP: newCycleXP, level: levelFromCycleXP(newCycleXP), rebirths: current.rebirths, lifetimeXP: current.lifetimeXP + gain };
+      await setDoc(userRef, { xp }, { merge: true });
+    } else {
+      xp = current;
+    }
     xpAwarded = true;
   }
 
@@ -351,6 +406,15 @@ const togglePlannerTask = async (uid, task, newDone) => {
 
 const deletePlannerTask = async (uid, taskId) => {
   await deleteDoc(doc(db, "users", uid, "plannerTasks", taskId));
+};
+
+// Resets the current cycle to level 1 and bumps the rebirth count — the
+// per-task XP rate goes up by XP_PER_TASK_INCREMENT for the new cycle.
+// Lifetime XP is never reset; it's a pure flavor stat.
+const doRebirth = async (uid, currentXP) => {
+  const newXP = { cycleXP: 0, level: 1, rebirths: currentXP.rebirths + 1, lifetimeXP: currentXP.lifetimeXP };
+  await setDoc(doc(db, "users", uid), { xp: newXP }, { merge: true });
+  return newXP;
 };
 
 const startSpeechRecognition = (onResult, onError, onStart, onEnd) => {
@@ -1054,6 +1118,77 @@ function VoiceOutputButton({ result }) {
   );
 }
 
+function AddToPlannerButton({ actionPlan, user, onGoogleSignIn }) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(() => (actionPlan || []).map(() => true));
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+
+  if (!actionPlan || actionPlan.length === 0) return null;
+
+  const handleOpen = () => {
+    if (!user) { setShowSignInPrompt(true); return; }
+    setOpen(true);
+  };
+
+  const toggleSelect = (i) => setSelected(prev => prev.map((v, idx) => idx === i ? !v : v));
+  const selectedCount = selected.filter(Boolean).length;
+
+  const handleConfirm = async () => {
+    setAdding(true);
+    const today = getLocalDateStr();
+    try {
+      const toAdd = actionPlan.filter((_, i) => selected[i]);
+      for (const text of toAdd) {
+        await addPlannerTask(user.uid, text, today, "decision-engine");
+      }
+      setAdded(true);
+      setOpen(false);
+    } catch (e) { console.error(e); }
+    finally { setAdding(false); }
+  };
+
+  if (added) return (
+    <div style={{ fontFamily: mono, fontSize: 12, color: "#4ade80", marginTop: 10 }}>Added to your planner ✓</div>
+  );
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      {!open ? (
+        <button onClick={handleOpen} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 4, padding: "8px 14px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, WebkitTapHighlightColor: "transparent" }}>
+          <Calendar size={13} strokeWidth={1.8} /> Add to Planner
+        </button>
+      ) : (
+        <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "16px", marginTop: 6 }}>
+          <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 12 }}>Add these to today's planner?</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {actionPlan.map((step, i) => (
+              <label key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={selected[i]} onChange={() => toggleSelect(i)} style={{ marginTop: 3, accentColor: "#4ade80", cursor: "pointer" }} />
+                <span style={{ fontFamily: mono, fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>{step}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => setOpen(false)} style={{ flex: 1, background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "10px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer" }}>Cancel</button>
+            <button onClick={handleConfirm} disabled={adding || selectedCount === 0} style={{ flex: 1, background: selectedCount > 0 ? "#fff" : "#1a1a1a", color: selectedCount > 0 ? "#000" : "#333", border: "none", borderRadius: 5, padding: "10px", fontFamily: mono, fontSize: 13, cursor: selectedCount > 0 ? "pointer" : "not-allowed" }}>
+              {adding ? "Adding..." : `Add ${selectedCount} task${selectedCount !== 1 ? "s" : ""}`}
+            </button>
+          </div>
+        </div>
+      )}
+      {showSignInPrompt && (
+        <div style={{ marginTop: 10, background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "14px", textAlign: "center" }}>
+          <div style={{ fontFamily: mono, fontSize: 12, color: "#aaa", marginBottom: 10 }}>Sign in to use the planner.</div>
+          <button onClick={onGoogleSignIn} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 4, padding: "8px 18px", fontFamily: mono, fontSize: 12, cursor: "pointer" }}>Sign in with Google</button>
+          <button onClick={() => setShowSignInPrompt(false)} style={{ background: "transparent", border: "none", color: "#444", fontFamily: mono, fontSize: 11, cursor: "pointer", display: "block", margin: "8px auto 0" }}>Maybe later</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StarRating({ result, situation, user, onGoogleSignIn, onRated }) {
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
@@ -1133,20 +1268,21 @@ function ResultSkeleton() {
   );
 }
 
-function PlannerPage({ user, onBack, onGoogleSignIn }) {
+function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
   const [tasks, setTasks] = useState([]);
-  const [xp, setXp] = useState({ total: 0, level: 1 });
   const [newTask, setNewTask] = useState("");
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [levelUpInfo, setLevelUpInfo] = useState(null); // { level, title }
+  const [showRebirthConfirm, setShowRebirthConfirm] = useState(false);
+  const [rebirthing, setRebirthing] = useState(false);
   const today = getLocalDateStr();
 
   useEffect(() => {
     if (!user) { setLoadingTasks(false); return; }
     (async () => {
       try {
-        const [allTasks, xpData] = await Promise.all([loadPlannerTasks(user.uid), loadXP(user.uid)]);
+        const allTasks = await loadPlannerTasks(user.uid);
         setTasks(allTasks.filter(t => t.date === today));
-        setXp(xpData);
       } catch (e) { console.error(e); }
       finally { setLoadingTasks(false); }
     })();
@@ -1165,11 +1301,17 @@ function PlannerPage({ user, onBack, onGoogleSignIn }) {
   const handleToggle = async (task) => {
     if (!user) return;
     const newDone = !task.done;
+    const prevLevel = xp.level;
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: newDone } : t));
     try {
       const { xpAwarded, xp: newXp } = await togglePlannerTask(user.uid, task, newDone);
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, xpAwarded } : t));
-      if (newXp) setXp(newXp);
+      if (newXp) {
+        onXPChange(newXp);
+        if (newXp.level > prevLevel) {
+          setLevelUpInfo({ level: newXp.level, title: getTitleForLevel(newXp.level) });
+        }
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -1179,8 +1321,20 @@ function PlannerPage({ user, onBack, onGoogleSignIn }) {
     try { await deletePlannerTask(user.uid, taskId); } catch (e) { console.error(e); }
   };
 
-  const xpIntoLevel = xp.total % XP_PER_LEVEL;
-  const xpProgressPct = xp.level >= MAX_LEVEL ? 100 : (xpIntoLevel / XP_PER_LEVEL) * 100;
+  const handleRebirth = async () => {
+    if (!user) return;
+    setRebirthing(true);
+    try {
+      const newXp = await doRebirth(user.uid, xp);
+      onXPChange(newXp);
+      setShowRebirthConfirm(false);
+    } catch (e) { console.error(e); }
+    finally { setRebirthing(false); }
+  };
+
+  const xpIntoLevel = xp.cycleXP % XP_PER_LEVEL;
+  const maxed = xp.level >= MAX_LEVEL;
+  const xpProgressPct = maxed ? 100 : (xpIntoLevel / XP_PER_LEVEL) * 100;
   const doneCount = tasks.filter(t => t.done).length;
 
   if (!user) {
@@ -1201,22 +1355,57 @@ function PlannerPage({ user, onBack, onGoogleSignIn }) {
 
   return (
     <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
+      {levelUpInfo && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: "#0d0d0d", border: "1px solid #4ade8060", borderRadius: 12, padding: 32, maxWidth: 380, width: "100%", textAlign: "center" }}>
+            <Trophy size={32} strokeWidth={1.5} color="#facc15" style={{ margin: "0 auto 16px", display: "block" }} />
+            <div style={{ fontFamily: mono, fontSize: 11, color: "#4ade80", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Level {levelUpInfo.level}</div>
+            <div style={{ fontFamily: syne, fontSize: 28, fontWeight: 800, color: "#fff", marginBottom: 20 }}>{levelUpInfo.title}</div>
+            <button onClick={() => setLevelUpInfo(null)} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "12px 28px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Continue</button>
+          </div>
+        </div>
+      )}
+
+      {showRebirthConfirm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: 10, padding: 28, maxWidth: 380, width: "100%", textAlign: "center" }}>
+            <Sparkles size={28} strokeWidth={1.5} color="#818cf8" style={{ margin: "0 auto 14px", display: "block" }} />
+            <div style={{ fontFamily: syne, fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 12 }}>Rebirth into Cycle {xp.rebirths + 2}?</div>
+            <div style={{ fontFamily: mono, fontSize: 13, color: "#888", lineHeight: 1.8, marginBottom: 24 }}>
+              You'll restart at Level 1, but earn <span style={{ color: "#4ade80" }}>{xpPerTask(xp.rebirths + 1)} XP</span> per task from here on, instead of {xpPerTask(xp.rebirths)}.
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button onClick={() => setShowRebirthConfirm(false)} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "12px 20px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer" }}>Not yet</button>
+              <button onClick={handleRebirth} disabled={rebirthing} style={{ background: "#fff", border: "none", borderRadius: 5, padding: "12px 20px", fontFamily: mono, fontSize: 13, color: "#000", cursor: "pointer" }}>{rebirthing ? "..." : "Rebirth"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Daily Planner</div>
       <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28 }}>
         {new Date().toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric" })}
       </div>
 
       <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase" }}>Level {xp.level}</span>
-          <span style={{ fontFamily: mono, fontSize: 12, color: "#666" }}>{xp.total} XP total</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+          <div>
+            <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 4 }}>Level {xp.level}{maxed ? " · MAX" : ""}</div>
+            <div style={{ fontFamily: syne, fontSize: 19, fontWeight: 700, color: "#fff" }}>{displayTitle(xp)}</div>
+          </div>
+          <span style={{ fontFamily: mono, fontSize: 12, color: "#666", flexShrink: 0 }}>{xp.lifetimeXP} XP lifetime</span>
         </div>
-        <div style={{ height: 8, borderRadius: 4, background: "#1a1a1a", overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${xpProgressPct}%`, background: "#4ade80", transition: "width 0.5s ease" }} />
+        <div style={{ height: 8, borderRadius: 4, background: "#1a1a1a", overflow: "hidden", marginTop: 14 }}>
+          <div style={{ height: "100%", width: `${xpProgressPct}%`, background: maxed ? "#818cf8" : "#4ade80", transition: "width 0.5s ease" }} />
         </div>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", marginTop: 8 }}>
-          {xp.level >= MAX_LEVEL ? "Max level reached 🎉" : `${xpIntoLevel} / ${XP_PER_LEVEL} XP to level ${xp.level + 1}`}
+          {maxed ? "Cycle complete — ready to rebirth" : `${xpIntoLevel} / ${XP_PER_LEVEL} XP to level ${xp.level + 1}`}
         </div>
+        {maxed && (
+          <button onClick={() => setShowRebirthConfirm(true)} style={{ marginTop: 14, width: "100%", background: "transparent", border: "1px solid #818cf860", borderRadius: 5, padding: "10px", fontFamily: mono, fontSize: 13, color: "#818cf8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, WebkitTapHighlightColor: "transparent" }}>
+            <Sparkles size={14} strokeWidth={1.8} /> Rebirth
+          </button>
+        )}
       </div>
 
       <div style={{ fontFamily: mono, fontSize: 12, color: "#666", marginBottom: 12 }}>
@@ -1270,7 +1459,7 @@ function PlannerPage({ user, onBack, onGoogleSignIn }) {
   );
 }
 
-function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
+function MainApp({ profile, user, personData, xpData, onXPUpdate, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, image?, result?, situation? }
   const bottomRef = useRef(null);
@@ -1286,6 +1475,8 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   const [stagedImage, setStagedImage] = useState(null); // { mimeType, data, dataUrl }
   const [attachError, setAttachError] = useState(null);
   const imageInputRef = useRef(null);
+
+  const xp = xpData || { cycleXP: 0, level: 1, rebirths: 0, lifetimeXP: 0 };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -1407,13 +1598,13 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   };
 
   if (showSettings) return (
-    <SettingsPage profile={profile} user={user} personData={personData}
+    <SettingsPage profile={profile} user={user} personData={personData} xpData={xpData}
       onEditProfile={() => { setShowSettings(false); setShowEditConfirm(true); }}
       onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />
   );
 
   if (showPlanner) return (
-    <PlannerPage user={user} onGoogleSignIn={onGoogleSignIn} onBack={() => setShowPlanner(false)} />
+    <PlannerPage user={user} xp={xp} onXPChange={onXPUpdate} onGoogleSignIn={onGoogleSignIn} onBack={() => setShowPlanner(false)} />
   );
 
 
@@ -1441,6 +1632,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
             {profile.grade}{profile.stream ? ` · ${profile.stream}` : ""}
             {!user && <span style={{ color: "#facc15", marginLeft: 6 }}>· guest</span>}
             {personData && personData.total > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· personalised ({personData.total})</span>}
+            {xpData && <span style={{ color: "#818cf8", marginLeft: 6 }}>· {displayTitle(xp)}</span>}
           </div>
         </div>
         <div
@@ -1514,7 +1706,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
                 const uInfo = getUrgencyLabel(m.result.confidence);
                 return (
                   <div key={i} style={{ alignSelf: "stretch" }}>
-                    <ResultView result={m.result} urgencyInfo={uInfo} />
+                    <ResultView result={m.result} urgencyInfo={uInfo} user={user} onGoogleSignIn={onGoogleSignIn} />
                     <StarRating result={m.result} situation={m.situation} user={user} onGoogleSignIn={onGoogleSignIn} onRated={onPersonDataRefresh} />
                   </div>
                 );
@@ -1608,7 +1800,7 @@ function MainApp({ profile, user, personData, onEditProfile, onSignOut, onGoogle
   );
 }
 
-function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onBack }) {
+function SettingsPage({ profile, user, personData, xpData, onEditProfile, onSignOut, onBack }) {
   return (
     <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
       <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 32 }}>Settings</div>
@@ -1650,6 +1842,18 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
           </div>
         </div>
       )}
+      {user && xpData && (
+        <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
+          <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Progress</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Trophy size={20} strokeWidth={1.5} color="#facc15" />
+            <div>
+              <div style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: "#fff" }}>{displayTitle(xpData)}</div>
+              <div style={{ fontFamily: mono, fontSize: 11, color: "#666", marginTop: 2 }}>Level {xpData.level} · {xpData.lifetimeXP} XP lifetime</div>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
         <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Your Profile</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1677,7 +1881,7 @@ function SettingsPage({ profile, user, personData, onEditProfile, onSignOut, onB
   );
 }
 
-function ResultView({ result, urgencyInfo }) {
+function ResultView({ result, urgencyInfo, user, onGoogleSignIn }) {
   return (
     <div style={{ animation: "fadeIn 0.4s ease forwards" }}>
       <div style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", marginBottom: 10, borderLeft: `3px solid ${urgencyInfo?.color || "#888"}` }}>
@@ -1727,6 +1931,7 @@ function ResultView({ result, urgencyInfo }) {
             </div>
           ))}
         </div>
+        <AddToPlannerButton actionPlan={result.action_plan} user={user} onGoogleSignIn={onGoogleSignIn} />
       </div>
 
       {result.warning && result.warning !== "null" && (
@@ -1744,11 +1949,17 @@ export default function Nirnayam() {
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
   const [personData, setPersonData] = useState(null);
+  const [xpData, setXpData] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
 
   const refreshPersonData = async (uid) => {
     const data = await loadPersonalisationStats(uid);
     setPersonData(data);
+  };
+
+  const refreshXP = async (uid) => {
+    const data = await loadXP(uid);
+    setXpData(data);
   };
 
   useEffect(() => {
@@ -1759,10 +1970,11 @@ export default function Nirnayam() {
         try {
           const savedProfile = await loadProfile(firebaseUser.uid);
           if (savedProfile) { setProfile(savedProfile); await refreshPersonData(firebaseUser.uid); }
+          await refreshXP(firebaseUser.uid);
         } catch (e) { console.error(e); }
         setScreen("landing");
       } else {
-        setUser(null); setProfile(null); setPersonData(null);
+        setUser(null); setProfile(null); setPersonData(null); setXpData(null);
         setScreen("landing");
       }
     });
@@ -1783,7 +1995,7 @@ export default function Nirnayam() {
 
   const handleSignOut = async () => {
     await signOut(auth);
-    setProfile(null); setPersonData(null); setScreen("landing");
+    setProfile(null); setPersonData(null); setXpData(null); setScreen("landing");
   };
 
   return (
@@ -1825,7 +2037,7 @@ export default function Nirnayam() {
           )}
       {screen === "landing" && <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />}
       {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} user={user} />}
-      {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
+      {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} xpData={xpData} onXPUpdate={setXpData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
     </div>
   );
 }
