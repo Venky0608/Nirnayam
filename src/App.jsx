@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, Volume2, Square, Camera, Calendar, Trash2, Trophy, Sparkles } from "lucide-react";
+import { Mic, Volume2, Square, Camera, Calendar, Trash2, Trophy, Sparkles, Flame } from "lucide-react";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, updateDoc, deleteDoc, query, orderBy, limit } from "firebase/firestore";
 import { auth, provider, db } from "./firebase";
@@ -374,34 +374,94 @@ const addPlannerTask = async (uid, text, date, source = "manual") => {
   return { id: ref.id, ...payload };
 };
 
-// Marks a task done/undone. Only the FIRST time a task is marked done does it
-// award XP (guarded by xpAwarded) — unchecking it later never claws XP back,
-// and re-checking it never re-awards, so toggling can't be farmed. No XP is
-// granted once a cycle is maxed at level 50 — the student has to rebirth to
-// keep earning.
+// ---------- Streak tracking ----------
+// A streak advances at most once per calendar day, driven purely by date
+// transitions — never by how many tasks got completed that day. That means
+// two tabs completing tasks at the same moment can't inflate it past the
+// correct value (both just compute the same date-based result), and
+// completing a 2nd/3rd task the same day is always a no-op once today is
+// already recorded.
+const getYesterdayStr = (from = new Date()) => {
+  const y = new Date(from);
+  y.setDate(y.getDate() - 1);
+  return getLocalDateStr(y);
+};
+
+const normalizeStreak = (raw) => raw || { count: 0, lastActiveDate: null, longest: 0 };
+
+const computeStreakUpdate = (currentStreak, today) => {
+  if (currentStreak.lastActiveDate === today) return currentStreak;
+  const yesterday = getYesterdayStr();
+  const newCount = currentStreak.lastActiveDate === yesterday ? currentStreak.count + 1 : 1;
+  return { count: newCount, lastActiveDate: today, longest: Math.max(currentStreak.longest || 0, newCount) };
+};
+
+// What to actually show, without writing anything: if the stored streak's
+// last-active day isn't today or yesterday, it's lapsed — even though the
+// stored count field itself won't reset until the next real task completion.
+// This is what lets the UI display an honest "0" the moment a streak breaks,
+// without needing a background job to go reset it.
+const getDisplayStreak = (streak) => {
+  const s = normalizeStreak(streak);
+  if (!s.lastActiveDate) return s;
+  const today = getLocalDateStr();
+  const yesterday = getYesterdayStr();
+  if (s.lastActiveDate === today || s.lastActiveDate === yesterday) return s;
+  return { count: 0, lastActiveDate: s.lastActiveDate, longest: s.longest || 0 };
+};
+
+const loadStreak = async (uid) => {
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    return normalizeStreak(snap.exists() ? snap.data().streak : null);
+  } catch { return normalizeStreak(null); }
+};
+
+// Marks a task done/undone. XP awards once per task, guarded by xpAwarded.
+// Streak updates independently — it can advance regardless of whether XP
+// was already claimed for this specific task, but never moves backward when
+// a task is unchecked. XP and streak share one Firestore read + one write
+// per completion, to keep this fast and avoid extra round trips.
 const togglePlannerTask = async (uid, task, newDone) => {
   const taskRef = doc(db, "users", uid, "plannerTasks", task.id);
   let xpAwarded = task.xpAwarded;
   let xp = null;
+  let streak = null;
 
-  if (newDone && !task.xpAwarded) {
+  if (newDone) {
     const userRef = doc(db, "users", uid);
     const snap = await getDoc(userRef);
-    const current = normalizeXP(snap.exists() ? snap.data().xp : null);
+    const data = snap.exists() ? snap.data() : {};
+    const currentXP = normalizeXP(data.xp);
+    const currentStreak = normalizeStreak(data.streak);
+    const today = getLocalDateStr();
+    const updates = {};
 
-    if (current.level < MAX_LEVEL) {
-      const gain = xpPerTask(current.rebirths);
-      const newCycleXP = current.cycleXP + gain;
-      xp = { cycleXP: newCycleXP, level: levelFromCycleXP(newCycleXP), rebirths: current.rebirths, lifetimeXP: current.lifetimeXP + gain };
-      await setDoc(userRef, { xp }, { merge: true });
-    } else {
-      xp = current;
+    if (!task.xpAwarded) {
+      if (currentXP.level < MAX_LEVEL) {
+        const gain = xpPerTask(currentXP.rebirths);
+        const newCycleXP = currentXP.cycleXP + gain;
+        xp = { cycleXP: newCycleXP, level: levelFromCycleXP(newCycleXP), rebirths: currentXP.rebirths, lifetimeXP: currentXP.lifetimeXP + gain };
+      } else {
+        xp = currentXP;
+      }
+      updates.xp = xp;
+      xpAwarded = true;
     }
-    xpAwarded = true;
+
+    const nextStreak = computeStreakUpdate(currentStreak, today);
+    streak = nextStreak;
+    if (nextStreak.lastActiveDate !== currentStreak.lastActiveDate) {
+      updates.streak = nextStreak;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await setDoc(userRef, updates, { merge: true });
+    }
   }
 
   await updateDoc(taskRef, { done: newDone, xpAwarded });
-  return { xpAwarded, xp };
+  return { xpAwarded, xp, streak };
 };
 
 const deletePlannerTask = async (uid, taskId) => {
@@ -1268,7 +1328,7 @@ function ResultSkeleton() {
   );
 }
 
-function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
+function PlannerPage({ user, xp, streak, onXPChange, onStreakChange, onBack, onGoogleSignIn }) {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState("");
   const [loadingTasks, setLoadingTasks] = useState(true);
@@ -1304,7 +1364,7 @@ function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
     const prevLevel = xp.level;
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: newDone } : t));
     try {
-      const { xpAwarded, xp: newXp } = await togglePlannerTask(user.uid, task, newDone);
+      const { xpAwarded, xp: newXp, streak: newStreak } = await togglePlannerTask(user.uid, task, newDone);
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, xpAwarded } : t));
       if (newXp) {
         onXPChange(newXp);
@@ -1312,6 +1372,7 @@ function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
           setLevelUpInfo({ level: newXp.level, title: getTitleForLevel(newXp.level) });
         }
       }
+      if (newStreak) onStreakChange(newStreak);
     } catch (e) { console.error(e); }
   };
 
@@ -1336,6 +1397,7 @@ function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
   const maxed = xp.level >= MAX_LEVEL;
   const xpProgressPct = maxed ? 100 : (xpIntoLevel / XP_PER_LEVEL) * 100;
   const doneCount = tasks.filter(t => t.done).length;
+  const displayStreak = getDisplayStreak(streak);
 
   if (!user) {
     return (
@@ -1344,7 +1406,7 @@ function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
         <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", textAlign: "center" }}>
           <div style={{ fontFamily: mono, fontSize: 13, color: "#aaa", marginBottom: 16, lineHeight: 1.7 }}>
             Sign in to use the planner.<br />
-            <span style={{ color: "#666", fontSize: 12 }}>Tasks and XP are saved to your account.</span>
+            <span style={{ color: "#666", fontSize: 12 }}>Tasks, XP and your streak are saved to your account.</span>
           </div>
           <button onClick={onGoogleSignIn} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 4, padding: "10px 24px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Sign in with Google</button>
         </div>
@@ -1385,6 +1447,19 @@ function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
       <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Daily Planner</div>
       <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28 }}>
         {new Date().toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric" })}
+      </div>
+
+      <div style={{ background: "#0d0d0d", border: `1px solid ${displayStreak.count > 0 ? "#fb923c40" : "#1e1e1e"}`, borderRadius: 8, padding: "18px 20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 14 }}>
+        <Flame size={30} strokeWidth={1.6} color={displayStreak.count > 0 ? "#fb923c" : "#3a3a3a"} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff" }}>
+            {displayStreak.count} day{displayStreak.count !== 1 ? "s" : ""}
+          </div>
+          <div style={{ fontFamily: mono, fontSize: 11, color: "#666", marginTop: 2 }}>
+            {displayStreak.count > 0 ? "Complete a task today to keep it going" : "Complete a task to start a streak"}
+            {displayStreak.longest > displayStreak.count ? ` · best: ${displayStreak.longest}` : ""}
+          </div>
+        </div>
       </div>
 
       <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 20 }}>
@@ -1459,7 +1534,7 @@ function PlannerPage({ user, xp, onXPChange, onBack, onGoogleSignIn }) {
   );
 }
 
-function MainApp({ profile, user, personData, xpData, onXPUpdate, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
+function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, onStreakUpdate, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, image?, result?, situation? }
   const bottomRef = useRef(null);
@@ -1477,6 +1552,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, onEditProfile,
   const imageInputRef = useRef(null);
 
   const xp = xpData || { cycleXP: 0, level: 1, rebirths: 0, lifetimeXP: 0 };
+  const streak = streakData || { count: 0, lastActiveDate: null, longest: 0 };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -1598,13 +1674,13 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, onEditProfile,
   };
 
   if (showSettings) return (
-    <SettingsPage profile={profile} user={user} personData={personData} xpData={xpData}
+    <SettingsPage profile={profile} user={user} personData={personData} xpData={xpData} streakData={streakData}
       onEditProfile={() => { setShowSettings(false); setShowEditConfirm(true); }}
       onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />
   );
 
   if (showPlanner) return (
-    <PlannerPage user={user} xp={xp} onXPChange={onXPUpdate} onGoogleSignIn={onGoogleSignIn} onBack={() => setShowPlanner(false)} />
+    <PlannerPage user={user} xp={xp} streak={streak} onXPChange={onXPUpdate} onStreakChange={onStreakUpdate} onGoogleSignIn={onGoogleSignIn} onBack={() => setShowPlanner(false)} />
   );
 
 
@@ -1633,6 +1709,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, onEditProfile,
             {!user && <span style={{ color: "#facc15", marginLeft: 6 }}>· guest</span>}
             {personData && personData.total > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· personalised ({personData.total})</span>}
             {xpData && <span style={{ color: "#818cf8", marginLeft: 6 }}>· {displayTitle(xp)}</span>}
+            {streakData && getDisplayStreak(streakData).count > 0 && <span style={{ color: "#fb923c", marginLeft: 6 }}>· 🔥{getDisplayStreak(streakData).count}</span>}
           </div>
         </div>
         <div
@@ -1800,7 +1877,8 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, onEditProfile,
   );
 }
 
-function SettingsPage({ profile, user, personData, xpData, onEditProfile, onSignOut, onBack }) {
+function SettingsPage({ profile, user, personData, xpData, streakData, onEditProfile, onSignOut, onBack }) {
+  const displayStreak = streakData ? getDisplayStreak(streakData) : null;
   return (
     <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
       <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 32 }}>Settings</div>
@@ -1845,13 +1923,21 @@ function SettingsPage({ profile, user, personData, xpData, onEditProfile, onSign
       {user && xpData && (
         <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Progress</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: displayStreak ? 14 : 0 }}>
             <Trophy size={20} strokeWidth={1.5} color="#facc15" />
             <div>
               <div style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: "#fff" }}>{displayTitle(xpData)}</div>
               <div style={{ fontFamily: mono, fontSize: 11, color: "#666", marginTop: 2 }}>Level {xpData.level} · {xpData.lifetimeXP} XP lifetime</div>
             </div>
           </div>
+          {displayStreak && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Flame size={20} strokeWidth={1.5} color={displayStreak.count > 0 ? "#fb923c" : "#3a3a3a"} />
+              <div style={{ fontFamily: mono, fontSize: 12, color: "#888" }}>
+                {displayStreak.count} day streak{displayStreak.longest > displayStreak.count ? ` · best: ${displayStreak.longest}` : ""}
+              </div>
+            </div>
+          )}
         </div>
       )}
       <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
@@ -1950,6 +2036,7 @@ export default function Nirnayam() {
   const [user, setUser] = useState(null);
   const [personData, setPersonData] = useState(null);
   const [xpData, setXpData] = useState(null);
+  const [streakData, setStreakData] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
 
   const refreshPersonData = async (uid) => {
@@ -1962,6 +2049,11 @@ export default function Nirnayam() {
     setXpData(data);
   };
 
+  const refreshStreak = async (uid) => {
+    const data = await loadStreak(uid);
+    setStreakData(data);
+  };
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setAuthLoading(false);
@@ -1971,10 +2063,11 @@ export default function Nirnayam() {
           const savedProfile = await loadProfile(firebaseUser.uid);
           if (savedProfile) { setProfile(savedProfile); await refreshPersonData(firebaseUser.uid); }
           await refreshXP(firebaseUser.uid);
+          await refreshStreak(firebaseUser.uid);
         } catch (e) { console.error(e); }
         setScreen("landing");
       } else {
-        setUser(null); setProfile(null); setPersonData(null); setXpData(null);
+        setUser(null); setProfile(null); setPersonData(null); setXpData(null); setStreakData(null);
         setScreen("landing");
       }
     });
@@ -1995,7 +2088,7 @@ export default function Nirnayam() {
 
   const handleSignOut = async () => {
     await signOut(auth);
-    setProfile(null); setPersonData(null); setXpData(null); setScreen("landing");
+    setProfile(null); setPersonData(null); setXpData(null); setStreakData(null); setScreen("landing");
   };
 
   return (
@@ -2037,7 +2130,7 @@ export default function Nirnayam() {
           )}
       {screen === "landing" && <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />}
       {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} user={user} />}
-      {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} xpData={xpData} onXPUpdate={setXpData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
+      {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} xpData={xpData} onXPUpdate={setXpData} streakData={streakData} onStreakUpdate={setStreakData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
     </div>
   );
 }
