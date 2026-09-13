@@ -128,11 +128,61 @@ OUTPUT RULES:
 Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown, no backticks. Just the raw JSON:
 {"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","splits":[{"label":"Physics","percent":10},{"label":"Math Paper","percent":40},{"label":"Chemistry Bonding","percent":50}],"key_insight":"one sentence that tips the decision","action_plan":["step 1 with time","step 2 with time","step 3 with time or reason to skip"],"warning":"one concrete risk or null"}`;
 
+// ============================================================
+// NEW: Long-term / life-direction decision prompt.
+// Same JSON output contract as buildSystemPrompt so ResultView,
+// AddToPlannerButton, StarRating, VoiceOutputButton all work unchanged.
+// ============================================================
+const buildSystemPromptLong = (profile, personData, useDeepDive) => `You are Nirnayam — but right now you are acting as a thoughtful, experienced mentor helping a student think through a decision that will shape their life direction, not just their day. This is NOT a scheduling question. Treat it with the weight it deserves.
+
+STUDENT PROFILE:
+- Grade: ${profile.grade}${profile.stream ? ` (${profile.stream})` : ""}
+- Academic goal: ${profile.academicGoal || "not specified"}${profile.competitiveExam ? ` — preparing for ${profile.competitiveExam}${profile.customExam ? ` (${profile.customExam})` : ""}` : ""}
+- Stress sensitivity: ${profile.stressLevel}/10
+- Deadline response: ${profile.deadlineResponse || "not specified"}
+- Life priorities: ${profile.priorities?.join(", ") || "not specified"}
+- Extracurriculars: ${profile.extracurriculars || "none"}
+- Extra context: ${profile.additionalContext || "none"}${buildPersonalisationContext(personData)}
+
+LANGUAGE: Handle spelling mistakes and casual language naturally. Never ask to rephrase.
+
+SCOPE: Answer any personal decision or life-direction question a student in grades 9-12 would realistically face — this includes but isn't limited to career, stream, exams, relationships, money/purchases relevant to their life stage, extracurriculars, and family or social conflicts. Judge by whether a student this age would plausibly be asking it, not by matching a fixed topic list. If the question is clearly unrelated to the student's personal life or decisions, return the restricted JSON response.
+
+CATEGORIES: Not a fixed list — output a short (1-3 word) category label that best describes THIS specific decision (e.g. "Career", "Stream Choice", "Major Purchase", "Relocation", "Relationship"). Never force-fit into a predefined set.
+
+CORE REASONING RULES FOR LONG-TERM DECISIONS:
+
+RULE 1 — WEIGH TRADE-OFFS EXPLICITLY: Never give a flat yes/no. Lay out what the student gains and gives up with each real option, grounded in their stated priorities and profile — not generic pros/cons lists.
+
+RULE 2 — USE WHAT'S ALREADY KNOWN ABOUT THIS STUDENT: Pull from their stated academic goal, stress sensitivity, priorities, and any personalisation ratings data provided. A generic answer that ignores their profile is a failure here — this is exactly where personalisation should matter most.
+
+RULE 3 — SURFACE THE REAL RISK, NOT A GENERIC WARNING: If a path has a genuine downside for THIS student specifically (e.g. their stated stress sensitivity vs. a high-pressure path), name it directly rather than a boilerplate caution.
+
+RULE 4 — DON'T DECIDE FOR THEM, BUT DON'T DODGE EITHER: Give a clear recommendation with reasoning, while being explicit about what would change your recommendation (e.g. "if X mattered more to you than Y, I'd lean the other way").
+
+RULE 5 — NEVER END WITHOUT NEXT STEPS: A career/life decision this size still needs a concrete first move — a person to talk to, information to gather, a smaller reversible test of the direction — never just "think about it more."
+
+${useDeepDive
+  ? `DEPTH: FULL BREAKDOWN MODE — the student explicitly asked for depth. Be thorough: address every option raised, walk through the reasoning behind the recommendation step by step, and don't compress trade-offs into one line each. action_plan should have real substance — reflect a genuine multi-step exploration process, not just 3 generic bullets.`
+  : `DEPTH: QUICK TAKE MODE — the student asked for a quick take on a long-term question. Still take the decision seriously and use their profile/personalisation data, but keep it tight: one clear recommendation, the single biggest trade-off, 2-3 action steps. Don't pad it — respect that they wanted brevity even on a big topic.`}
+
+OUTPUT RULES:
+- splits array: represents rough weight/consideration given to each option discussed, whole number percentages summing to exactly 100, min 2 max 5 entries
+- action_plan: concrete next steps toward gathering information or testing the direction — never "decide later" or vague reflection
+
+Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown, no backticks. Just the raw JSON:
+{"decision":"one clear recommendation","confidence":85,"urgency":"high","category":"Career","splits":[{"label":"Option A","percent":60},{"label":"Option B","percent":40}],"key_insight":"one sentence that tips the decision","action_plan":["step 1","step 2","step 3"],"warning":"one concrete, specific risk or null"}`;
+
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
-const callNirnayam = async (situation, profile, personData) => {
+
+// UPDATED: now takes useDeepDive + isLongTerm to pick the right prompt/config.
+const callNirnayam = async (situation, profile, personData, useDeepDive = false, isLongTerm = false) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120000);
   try {
+    const systemPrompt = isLongTerm
+      ? buildSystemPromptLong(profile, personData, useDeepDive)
+      : buildSystemPrompt(profile, personData);
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -140,9 +190,9 @@ const callNirnayam = async (situation, profile, personData) => {
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: buildSystemPrompt(profile, personData) }] },
+          system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: "user", parts: [{ text: situation }] }],
-          generationConfig: { maxOutputTokens: 5000, temperature: 0.4, responseMimeType: "application/json" }
+          generationConfig: { maxOutputTokens: useDeepDive ? 8000 : (isLongTerm ? 3000 : 5000), temperature: 0.4, responseMimeType: "application/json" }
         })
       }
     );
@@ -165,6 +215,10 @@ const callNirnayam = async (situation, profile, personData) => {
 // with the core `decide` feature under load.
 const CHAT_KEY = import.meta.env.VITE_GEMINI_CHAT_KEY;
 
+// UPDATED: classifyIntent now also returns a `horizon` tag ("short" | "long")
+// in the SAME Gemini call — no second classifier call, keeps latency flat.
+// Horizon is decided by whether the decision changes the student's day-to-day
+// routine/direction going forward, NOT by whether it's reversible.
 const classifyIntent = async (message) => {
   try {
     const response = await fetch(
@@ -177,7 +231,7 @@ const classifyIntent = async (message) => {
         body: JSON.stringify({
           generationConfig: {
             temperature: 0,
-            maxOutputTokens: 30,
+            maxOutputTokens: 50,
             responseMimeType: "application/json",
           },
           contents: [
@@ -190,7 +244,8 @@ const classifyIntent = async (message) => {
 Return ONLY valid JSON.
 
 {
-  "route":"study"
+  "route":"study",
+  "horizon":"short"
 }
 
 Allowed routes:
@@ -198,7 +253,16 @@ Allowed routes:
 - decision
 - both
 
-Definitions:
+Allowed horizon values (ONLY meaningful when route is "decision" or "both" — otherwise default to "short"):
+- short
+- long
+
+HORIZON RULE:
+Ask: "Does this change how the student's days/routine look going forward, regardless of whether it's reversible?"
+- If NO — a one-off, today-scoped, or momentary choice — horizon is "short".
+- If YES — it restructures daily life, routine, or identity/direction going forward — horizon is "long".
+
+Route definitions:
 
 study:
 The student wants an explanation, concept, derivation, formula, learning help, homework explanation or academic teaching.
@@ -213,21 +277,48 @@ Examples:
 
 User:
 Explain photosynthesis.
-
 Output:
-{"route":"study"}
+{"route":"study","horizon":"short"}
 
 User:
 Should I study physics or chemistry today?
-
 Output:
-{"route":"decision"}
+{"route":"decision","horizon":"short"}
+
+User:
+Should I nap now?
+Output:
+{"route":"decision","horizon":"short"}
+
+User:
+Should I study math for my SATs today or play basketball for my Jr NBA tryouts?
+Output:
+{"route":"decision","horizon":"short"}
+
+User:
+What career should I choose?
+Output:
+{"route":"decision","horizon":"long"}
+
+User:
+Is becoming an engineer worth it?
+Output:
+{"route":"decision","horizon":"long"}
+
+User:
+Should I switch my stream from PCM to Commerce?
+Output:
+{"route":"decision","horizon":"long"}
+
+User:
+Should I take a gap year?
+Output:
+{"route":"decision","horizon":"long"}
 
 User:
 Should I study electrostatics first? Also explain Coulomb's law.
-
 Output:
-{"route":"both"}
+{"route":"both","horizon":"short"}
 
 Now classify this:
 
@@ -256,18 +347,12 @@ if (!match) throw new Error("No JSON");
 
 const parsed = JSON.parse(match[0]);
 
-    if (
-      parsed.route === "study" ||
-      parsed.route === "decision" ||
-      parsed.route === "both"
-    ) {
-      return parsed.route;
-    }
-
-    return "decision";
+    const route = ["study", "decision", "both"].includes(parsed.route) ? parsed.route : "decision";
+    const horizon = parsed.horizon === "long" ? "long" : "short";
+    return { route, horizon };
   } catch (err) {
     console.error("Router Error:", err);
-    return "decision";
+    return { route: "decision", horizon: "short" };
   }
 };
 
@@ -1536,7 +1621,7 @@ function PlannerPage({ user, xp, streak, onXPChange, onStreakChange, onBack, onG
 
 function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, onStreakUpdate, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat', text?, image?, result?, situation? }
+  const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat'|'horizon-choice', text?, image?, result?, situation? }
   const bottomRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -1545,6 +1630,13 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
   const [voiceError, setVoiceError] = useState(null);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
+
+  // NEW: session-scoped long-term-decision mode. null until the first
+  // long-term question is asked and the user picks a depth; then reused
+  // silently for every subsequent long-term question in this chat.
+  // Resets automatically on refresh since it's plain useState.
+  const [longTermMode, setLongTermMode] = useState(null); // null | "quick" | "deep"
+  const [pendingLongTerm, setPendingLongTerm] = useState(null); // { situation } while chip is showing
 
   // Staged image: attached (via paste or file picker) but not yet sent.
   const [stagedImage, setStagedImage] = useState(null); // { mimeType, data, dataUrl }
@@ -1601,6 +1693,25 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
     e.target.value = "";
   };
 
+  // NEW: called when the user picks "Quick take" or "Full breakdown" on the
+  // one-time horizon-choice chip. Sets the standing session preference,
+  // then resumes the original in-flight decision request.
+  const resolveHorizonChoice = async (choice) => {
+    setLongTermMode(choice);
+    const { situation } = pendingLongTerm;
+    setPendingLongTerm(null);
+    setMessages(prev => prev.filter(m => m.kind !== "horizon-choice"));
+    setLoading(true);
+    try {
+      const res = await callNirnayam(situation, profile, personData, choice === "deep", true);
+      setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation }]);
+    } catch (e) {
+      setError(e.message || "Something went wrong. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSend = async () => {
     const trimmed = input.trim();
     if ((!trimmed && !stagedImage) || loading) return;
@@ -1617,10 +1728,22 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
 
     try {
       // Images always go to the study/tutor chat — the decision engine can't read images.
-      const intent = imageForThisSend ? "study" : await classifyIntent(trimmed);
+      // UPDATED: classifyIntent now returns { route, horizon } in one call.
+      const { route: intent, horizon } = imageForThisSend
+        ? { route: "study", horizon: "short" }
+        : await classifyIntent(trimmed);
 
       if (!imageForThisSend && (intent === "decision" || intent === "both")) {
-        const res = await callNirnayam(trimmed, profile, personData);
+        if (horizon === "long" && longTermMode === null) {
+          // First long-term hit this session — pause and ask once via the chip.
+          setPendingLongTerm({ situation: trimmed });
+          setMessages(prev => [...prev, { role: "assistant", kind: "horizon-choice", situation: trimmed }]);
+          setLoading(false);
+          return;
+        }
+        const isLong = horizon === "long";
+        const useDeepDive = isLong && longTermMode === "deep";
+        const res = await callNirnayam(trimmed, profile, personData, useDeepDive, isLong);
         setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation: trimmed }]);
       }
 
@@ -1709,7 +1832,11 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
             {!user && <span style={{ color: "#facc15", marginLeft: 6 }}>· guest</span>}
             {personData && personData.total > 0 && <span style={{ color: "#4ade80", marginLeft: 6 }}>· personalised ({personData.total})</span>}
             {xpData && <span style={{ color: "#818cf8", marginLeft: 6 }}>· {displayTitle(xp)}</span>}
-            {streakData && getDisplayStreak(streakData).count > 0 && <span style={{ color: "#fb923c", marginLeft: 6 }}>· 🔥{getDisplayStreak(streakData).count}</span>}
+            {streakData && getDisplayStreak(streakData).count > 0 && (
+              <span style={{ color: "#fb923c", marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                · <Flame size={12} strokeWidth={1.8} color="#fb923c" style={{ marginBottom: -1 }} />{getDisplayStreak(streakData).count}
+              </span>
+            )}
           </div>
         </div>
         <div
@@ -1776,6 +1903,27 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
                         {m.text}
                       </div>
                     )}
+                  </div>
+                );
+              }
+              // NEW: one-time horizon confirmation chip.
+              if (m.kind === "horizon-choice") {
+                return (
+                  <div key={i} style={{ alignSelf: "stretch", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "18px 20px", animation: "fadeIn 0.3s ease forwards" }}>
+                    <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 10 }}>
+                      This looks like a bigger decision
+                    </div>
+                    <div style={{ fontFamily: mono, fontSize: 13, color: "#999", lineHeight: 1.7, marginBottom: 16 }}>
+                      Want the full breakdown, or a quick take? This applies to career/life-direction questions for the rest of this chat.
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button onClick={() => resolveHorizonChoice("quick")} style={{ flex: 1, background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, color: "#ccc", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+                        Quick take
+                      </button>
+                      <button onClick={() => resolveHorizonChoice("deep")} style={{ flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "12px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+                        Full breakdown
+                      </button>
+                    </div>
                   </div>
                 );
               }
