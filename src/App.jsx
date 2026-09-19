@@ -2170,6 +2170,27 @@ function ResultView({ result, urgencyInfo, user, onGoogleSignIn }) {
         <div style={{ fontFamily: mono, fontSize: 15, color: "#bbb", lineHeight: 1.7, fontStyle: "italic" }}>"{result.key_insight}"</div>
       </div>
 
+      {result.tradeoffs && result.tradeoffs.length > 0 && (
+        <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
+          <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>Trade-offs by option</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {result.tradeoffs.map((t, i) => (
+              <div key={i} style={{ paddingBottom: i < result.tradeoffs.length - 1 ? 18 : 0, borderBottom: i < result.tradeoffs.length - 1 ? "1px solid #1a1a1a" : "none" }}>
+                <div style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 8 }}>{t.option}</div>
+                <div style={{ display: "flex", gap: 10, marginBottom: 6, alignItems: "flex-start" }}>
+                  <span style={{ color: "#4ade80", fontFamily: mono, fontSize: 13, flexShrink: 0 }}>+</span>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>{t.gain}</span>
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ color: "#fb923c", fontFamily: mono, fontSize: 13, flexShrink: 0 }}>–</span>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>{t.cost}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "18px", marginBottom: 10 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Action plan</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
