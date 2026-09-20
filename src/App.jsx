@@ -76,7 +76,129 @@ const buildPersonalisationContext = (personData) => {
   return `\n\nPERSONALISATION (${personData.total} ratings — always incorporate):\n${lines.join("\n")}\nAdjust recommendations based on what has historically worked well. Never ignore this.`;
 };
 
-const buildSystemPrompt = (profile, personData) => `You are Nirnayam — a sharp, practical decision advisor for students grades 9-12. Your job is to break decision paralysis fast with clear, reasoned recommendations.
+// ============================================================
+// RIASEC (Holland Code) psychometric test — questions, scoring,
+// storage, and the two ways its data feeds the decision engine:
+// silently for short-term answers, explicitly for long-term ones.
+// ============================================================
+const RIASEC_QUESTIONS = [
+  { id: "r1", category: "R", text: "Given a free weekend, I'd rather take apart a broken gadget to see how it works than write a story about it." },
+  { id: "r2", category: "R", text: "I enjoy building or fixing something with my hands — assembling a model, setting up hardware, repairing something." },
+  { id: "r3", category: "R", text: "In a group project, I'd rather actually build or test the prototype than make the presentation slides." },
+  { id: "r4", category: "R", text: "I'd rather spend an afternoon in a workshop or lab than at a debate club." },
+  { id: "r5", category: "R", text: "I get bored quickly with tasks that involve physical assembly or hands-on fixing.", reverse: true },
+
+  { id: "i1", category: "I", text: "When something breaks or doesn't make sense, I want to figure out exactly why before moving on." },
+  { id: "i2", category: "I", text: "I'll dig deep into one topic — a science mystery, a stubborn coding bug — even if it takes hours to fully get it." },
+  { id: "i3", category: "I", text: "Given a choice, I'd pick an extra-credit research project over a group art project." },
+  { id: "i4", category: "I", text: "I like spotting the pattern or reasoning behind a rule in math or physics, not just memorizing the rule." },
+  { id: "i5", category: "I", text: "I'd rather follow clear step-by-step instructions than investigate a problem from scratch on my own.", reverse: true },
+
+  { id: "a1", category: "A", text: "I'd rather write a short story, design a poster, or compose something than analyze data for a report." },
+  { id: "a2", category: "A", text: "I enjoy tasks with no single \"correct\" answer — a creative writing prompt, an open-ended art project." },
+  { id: "a3", category: "A", text: "I'd rather express an idea through visuals, music, or writing than through a spreadsheet or formula." },
+  { id: "a4", category: "A", text: "In a school project, I'm the one pushing to make it look or feel unique, not just get it finished." },
+  { id: "a5", category: "A", text: "I feel more comfortable following a strict rubric than making something fully original.", reverse: true },
+
+  { id: "s1", category: "S", text: "I enjoy helping a classmate understand something they're stuck on, even if I have to explain it more than once." },
+  { id: "s2", category: "S", text: "I'd rather work through problems out loud in a study group than study completely alone." },
+  { id: "s3", category: "S", text: "I find it genuinely satisfying to organize a group activity, mentor a junior student, or volunteer." },
+  { id: "s4", category: "S", text: "I care a lot about how my group members are feeling during a stressful project, not just the deadline." },
+  { id: "s5", category: "S", text: "I'd rather work through a problem entirely by myself than explain my thinking to someone else.", reverse: true },
+
+  { id: "e1", category: "E", text: "I enjoy taking charge of a group project and deciding how tasks get split up." },
+  { id: "e2", category: "E", text: "I like convincing others to see things my way — picking a plan, a strategy, even just a movie." },
+  { id: "e3", category: "E", text: "Competition energizes me — a debate, a pitch contest, a leaderboard — more than a quiet solo task does." },
+  { id: "e4", category: "E", text: "I often think about how to make something bigger or more ambitious than what was actually asked for." },
+  { id: "e5", category: "E", text: "I'd rather follow someone else's plan than come up with and lead my own.", reverse: true },
+
+  { id: "c1", category: "C", text: "I like having a clear checklist or schedule, and I feel uneasy when things are unplanned." },
+  { id: "c2", category: "C", text: "I enjoy organizing notes, files, or a study plan so everything has a clear place." },
+  { id: "c3", category: "C", text: "I carefully double-check details — spelling, formatting, numbers — before submitting anything." },
+  { id: "c4", category: "C", text: "I prefer following an established, proven method over improvising a new one." },
+  { id: "c5", category: "C", text: "I get bored or irritated by tasks that involve a lot of repetitive organizing or double-checking.", reverse: true },
+];
+
+const RIASEC_META = {
+  R: { label: "Realistic", color: "#c2793f", blurb: "You're drawn to hands-on, practical work — building, fixing, or working directly with tools and physical systems. You learn best by doing, not just reading about it." },
+  I: { label: "Investigative", color: "#60a5fa", blurb: "You're driven by analytical curiosity — you want to understand why something works, not just how to use it. Research, debugging, and open problems genuinely interest you." },
+  A: { label: "Artistic", color: "#c084fc", blurb: "You value original expression and open-ended work without one correct answer. You think in terms of ideas, aesthetics, and making something genuinely yours." },
+  S: { label: "Social", color: "#4ade80", blurb: "You're energized by helping, teaching, and connecting with people. Explaining things to others and being part of a team isn't a chore for you — it's motivating." },
+  E: { label: "Enterprising", color: "#f472b6", blurb: "You like leading, persuading, and taking initiative, especially under competition or pressure. You naturally think about scale and ambition, not just completing the task." },
+  C: { label: "Conventional", color: "#94a3b8", blurb: "You value structure, order, and precision. Clear systems, checklists, and reliable methods feel comfortable to you, and you catch details others miss." },
+};
+
+const shuffleArray = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// Each category has 5 items (max raw score 25, incl. the reverse item scored
+// backwards). Normalized to a 0-100% so the six bars are directly comparable.
+const computeRiasecResults = (questions, answers) => {
+  const totals = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
+  questions.forEach(q => {
+    const raw = answers[q.id] || 3;
+    const val = q.reverse ? (6 - raw) : raw;
+    totals[q.category] += val;
+  });
+  const scores = {};
+  Object.keys(totals).forEach(cat => {
+    scores[cat] = Math.round((totals[cat] / 25) * 100);
+  });
+  const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]).map(([cat]) => cat);
+  const code = ranked.slice(0, 3).join("");
+  return { scores, ranked, code };
+};
+
+const saveRiasecResult = async (uid, data) => {
+  await setDoc(doc(db, "users", uid), { riasec: { ...data, takenAt: new Date().toISOString() } }, { merge: true });
+};
+const loadRiasecResult = async (uid) => {
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    return snap.exists() && snap.data().riasec ? snap.data().riasec : null;
+  } catch { return null; }
+};
+
+// explicit=false (short-term prompt): the model uses the trait data to shape
+// tone/suggestions but must NEVER name a trait or the test itself.
+// explicit=true (long-term prompt): the model may name traits directly when
+// reasoning through career/life-direction trade-offs.
+const buildRiasecContext = (riasecData, explicit) => {
+  if (!riasecData || !riasecData.scores) return "";
+  const { scores, code, ranked } = riasecData;
+  const order = ranked && ranked.length === 6 ? ranked : Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+  const topLabels = order.slice(0, 3).map(cat => RIASEC_META[cat].label);
+  if (explicit) {
+    return `\n\nRIASEC PROFILE (Holland Code: ${code} — a real psychometric result for this student, always incorporate explicitly in trade-off reasoning):\n${order.map(cat => `${RIASEC_META[cat].label}: ${scores[cat]}%`).join(", ")}\nYou may name these traits directly (e.g. "given your strong Investigative and Artistic profile...") when reasoning about career, stream, or life-direction trade-offs.`;
+  }
+  return `\n\nRIASEC PROFILE (Holland Code: ${code} — use ONLY to silently shape which suggestions and tone fit this student; strongest traits: ${topLabels.join(", ")}. NEVER name a trait, a code letter, or mention this test in your response — it must read as ordinary personalized advice, not a callback to a test result.)`;
+};
+
+const buildRiasecSynthesisPrompt = (scores, code, profile) => `You are Nirnayam, helping a student interpret their Holland Code (RIASEC) psychometric test results.
+
+STUDENT PROFILE:
+- Grade: ${profile.grade}${profile.stream ? ` (${profile.stream})` : ""}
+- Academic goal: ${profile.academicGoal || "not specified"}${profile.competitiveExam ? ` — preparing for ${profile.competitiveExam}` : ""}
+- Life priorities: ${profile.priorities?.join(", ") || "not specified"}
+
+RIASEC RESULTS (percentage of max per category, out of 100):
+${Object.entries(scores).map(([cat, pct]) => `${RIASEC_META[cat].label}: ${pct}%`).join("\n")}
+Holland Code: ${code}
+
+Write a short, specific paragraph (4-6 sentences) that:
+1. Names what their top traits actually mean in practice for a student their age.
+2. Explicitly connects it to THEIR stated stream/academic goal — say plainly whether their current path aligns with, complements, or sits in tension with their trait profile, using specifics from their profile, not a generic statement.
+3. Avoids generic horoscope-style language ("you're a natural leader!") — ground every claim in the actual scores and profile given.
+
+Do not use markdown formatting. Return plain text only, no preamble like "Here's your synthesis" — just the paragraph itself.`;
+
+const buildSystemPrompt = (profile, personData, riasecData) => `You are Nirnayam — a sharp, practical decision advisor for students grades 9-12. Your job is to break decision paralysis fast with clear, reasoned recommendations.
 
 STUDENT PROFILE:
 - Grade: ${profile.grade}${profile.stream ? ` (${profile.stream})` : ""}
@@ -92,7 +214,7 @@ STUDENT PROFILE:
 - Distraction level: ${profile.learningStyle?.distraction}/10
 - Slow at clearing doubts: ${profile.learningStyle?.doubtTime || "not specified"}
 - Extracurriculars: ${profile.extracurriculars || "none"}
-- Extra context: ${profile.additionalContext || "none"}${buildPersonalisationContext(personData)}
+- Extra context: ${profile.additionalContext || "none"}${buildPersonalisationContext(personData)}${buildRiasecContext(riasecData, false)}
 
 LANGUAGE: Handle spelling mistakes and casual language naturally. tmr=tomorrow, rn=now, stressed=high stress, kinda worried=medium, chill=low. Never ask to rephrase.
 
@@ -129,18 +251,18 @@ Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown,
 {"decision":"one clear action","confidence":85,"urgency":"high","category":"Study","splits":[{"label":"Physics","percent":10},{"label":"Math Paper","percent":40},{"label":"Chemistry Bonding","percent":50}],"key_insight":"one sentence that tips the decision","action_plan":["step 1 with time","step 2 with time","step 3 with time or reason to skip"],"warning":"one concrete risk or null"}`;
 
 // ============================================================
-// NEW: Long-term / life-direction decision prompt.
+// Long-term / life-direction decision prompt.
 // Same JSON output contract as buildSystemPrompt so ResultView,
 // AddToPlannerButton, StarRating, VoiceOutputButton all work unchanged.
 // ============================================================
-const LONG_TERM_SHARED_CONTEXT = (profile, personData) => `STUDENT PROFILE:
+const LONG_TERM_SHARED_CONTEXT = (profile, personData, riasecData) => `STUDENT PROFILE:
 - Grade: ${profile.grade}${profile.stream ? ` (${profile.stream})` : ""}
 - Academic goal: ${profile.academicGoal || "not specified"}${profile.competitiveExam ? ` — preparing for ${profile.competitiveExam}${profile.customExam ? ` (${profile.customExam})` : ""}` : ""}
 - Stress sensitivity: ${profile.stressLevel}/10
 - Deadline response: ${profile.deadlineResponse || "not specified"}
 - Life priorities: ${profile.priorities?.join(", ") || "not specified"}
 - Extracurriculars: ${profile.extracurriculars || "none"}
-- Extra context: ${profile.additionalContext || "none"}${buildPersonalisationContext(personData)}
+- Extra context: ${profile.additionalContext || "none"}${buildPersonalisationContext(personData)}${buildRiasecContext(riasecData, true)}
 
 LANGUAGE: Handle spelling mistakes and casual language naturally. Never ask to rephrase.
 
@@ -148,20 +270,20 @@ SCOPE: Answer any personal decision or life-direction question a student in grad
 
 CATEGORIES: Not a fixed list — output a short (1-3 word) category label that best describes THIS specific decision (e.g. "Career", "Stream Choice", "Major Purchase", "Relocation", "Relationship"). Never force-fit into a predefined set.`;
 
-// DEEP DIVE and QUICK TAKE now use genuinely different JSON schemas and
-// hard structural constraints — not the same shape with a "be brief/be
+// DEEP DIVE and QUICK TAKE use genuinely different JSON schemas and
+// structural constraints — not the same shape with a "be brief/be
 // thorough" tone note. That's what makes them actually feel different.
-const buildSystemPromptLong = (profile, personData, useDeepDive) => {
+const buildSystemPromptLong = (profile, personData, riasecData, useDeepDive) => {
   if (useDeepDive) {
     return `You are Nirnayam — acting as a thoughtful, experienced mentor helping a student think through a decision that will shape their life direction, not just their day. The student explicitly asked for the FULL BREAKDOWN. They want real depth — genuinely more analysis than a normal answer, not just a longer version of a summary card.
 
-${LONG_TERM_SHARED_CONTEXT(profile, personData)}
+${LONG_TERM_SHARED_CONTEXT(profile, personData, riasecData)}
 
 FULL BREAKDOWN — ALL OF THESE ARE MANDATORY, AND THIS RESPONSE SHOULD READ AS NOTICEABLY MORE THOROUGH THAN A QUICK ANSWER:
 
 RULE 1 — REAL TRADE-OFF ANALYSIS: Identify 3-5 realistic options (include non-obvious ones the student may not have named explicitly, like a middle path or a way to delay/de-risk the choice). For EACH one, write 1-2 full sentences on what they gain and 1-2 full sentences on what they give up, grounded in this student's actual profile — not generic pros/cons. This goes in the "tradeoffs" array.
 
-RULE 2 — USE WHAT'S ALREADY KNOWN ABOUT THIS STUDENT: Pull explicitly from their stated academic goal, stress sensitivity, priorities, and any personalisation data, and name it directly (e.g. "given your 7/10 stress sensitivity and stated priority on X..."). A generic answer that ignores their profile is a failure here.
+RULE 2 — USE WHAT'S ALREADY KNOWN ABOUT THIS STUDENT: Pull explicitly from their stated academic goal, stress sensitivity, priorities, and any personalisation or RIASEC data, and name it directly (e.g. "given your 7/10 stress sensitivity and stated priority on X..."). A generic answer that ignores their profile is a failure here.
 
 RULE 3 — NAME THE REAL RISK: If a path has a genuine downside for THIS student specifically, explain it in real depth — not a boilerplate one-liner.
 
@@ -175,7 +297,7 @@ Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown,
 
   return `You are Nirnayam — acting as a mentor on a life-direction question. The student asked for a QUICK TAKE rather than a deep dive, so keep it focused and don't sprawl into an exhaustive breakdown of every option — but still give them a real, complete answer. Immediate/practical questions like this are the most common thing students ask, and they can still be genuinely complicated, so don't artificially shrink the answer if the situation actually needs more than one or two lines. Use as much space as the question actually needs to be properly answered, just without the full multi-option trade-off analysis of deep-dive mode.
 
-${LONG_TERM_SHARED_CONTEXT(profile, personData)}
+${LONG_TERM_SHARED_CONTEXT(profile, personData, riasecData)}
 
 QUICK TAKE GUIDANCE:
 - decision: one clear recommendation — a full sentence, not a fragment.
@@ -190,14 +312,14 @@ Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown,
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_KEY;
 
-// UPDATED: now takes useDeepDive + isLongTerm to pick the right prompt/config.
-const callNirnayam = async (situation, profile, personData, useDeepDive = false, isLongTerm = false) => {
+// Takes riasecData + useDeepDive + isLongTerm to pick the right prompt/config.
+const callNirnayam = async (situation, profile, personData, riasecData, useDeepDive = false, isLongTerm = false) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120000);
   try {
     const systemPrompt = isLongTerm
-      ? buildSystemPromptLong(profile, personData, useDeepDive)
-      : buildSystemPrompt(profile, personData);
+      ? buildSystemPromptLong(profile, personData, riasecData, useDeepDive)
+      : buildSystemPrompt(profile, personData, riasecData);
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -227,13 +349,39 @@ const callNirnayam = async (situation, profile, personData, useDeepDive = false,
 
 // Uses the CHAT key (not the decision-engine key) — classification runs on
 // every message, so keeping it off the decide key avoids any contention
-// with the core `decide` feature under load.
+// with the core `decide` feature under load. Also used for the (cheap,
+// one-time) RIASEC synthesis paragraph below.
 const CHAT_KEY = import.meta.env.VITE_GEMINI_CHAT_KEY;
 
-// UPDATED: classifyIntent now also returns a `horizon` tag ("short" | "long")
-// in the SAME Gemini call — no second classifier call, keeps latency flat.
-// Horizon is decided by whether the decision changes the student's day-to-day
-// routine/direction going forward, NOT by whether it's reversible.
+// One-time call generating the plain-language "what this means for you"
+// paragraph shown on the RIASEC results page. Costs a fraction of a cent —
+// small prompt, short capped output.
+const getRiasecSynthesis = async (scores, code, profile) => {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${CHAT_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generationConfig: { temperature: 0.5, maxOutputTokens: 400 },
+          contents: [{ role: "user", parts: [{ text: buildRiasecSynthesisPrompt(scores, code, profile) }] }]
+        })
+      }
+    );
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    return text || "Your results are ready — take a look at your trait breakdown below.";
+  } catch (err) {
+    console.error("RIASEC synthesis error:", err);
+    return "Your results are ready — take a look at your trait breakdown below.";
+  }
+};
+
+// classifyIntent returns { route, horizon } in ONE Gemini call — no second
+// classifier call, keeps latency flat. Horizon is decided by whether the
+// decision changes the student's day-to-day routine/direction going
+// forward, NOT by whether it's reversible.
 const classifyIntent = async (message) => {
   try {
     const response = await fetch(
@@ -1634,7 +1782,178 @@ function PlannerPage({ user, xp, streak, onXPChange, onStreakChange, onBack, onG
   );
 }
 
-function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, onStreakUpdate, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
+// ============================================================
+// RIASEC test-taking screen — 30 questions, shuffled per attempt.
+// ============================================================
+function RiasecTestPage({ onComplete, onCancel }) {
+  const [questions] = useState(() => shuffleArray(RIASEC_QUESTIONS));
+  const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const answeredCount = Object.keys(answers).length;
+  const allAnswered = answeredCount === questions.length;
+
+  const setAnswer = (id, val) => setAnswers(a => ({ ...a, [id]: val }));
+
+  const LIKERT = [1, 2, 3, 4, 5];
+
+  const handleSubmit = async () => {
+    if (!allAnswered || submitting) return;
+    setSubmitting(true);
+    const results = computeRiasecResults(questions, answers);
+    await onComplete(results);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", padding: "32px 20px 80px", maxWidth: 640, margin: "0 auto" }}>
+      <div style={{ fontFamily: syne, fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Holland Code Test</div>
+      <div style={{ fontFamily: mono, fontSize: 13, color: "#666", marginBottom: 6, lineHeight: 1.7 }}>
+        Answer honestly — there's no right answer, just what's true for you.
+      </div>
+      <div style={{ fontFamily: mono, fontSize: 11, color: "#555", marginBottom: 20 }}>
+        1 = Strongly disagree &nbsp;·&nbsp; 3 = Neutral &nbsp;·&nbsp; 5 = Strongly agree
+      </div>
+      <div style={{ fontFamily: mono, fontSize: 12, color: "#4ade80", marginBottom: 24, position: "sticky", top: 0, background: "#080808", padding: "10px 0", zIndex: 5, borderBottom: "1px solid #1a1a1a" }}>
+        {answeredCount} / {questions.length} answered
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {questions.map((q, idx) => (
+          <div key={q.id} style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "18px 20px" }}>
+            <div style={{ fontFamily: mono, fontSize: 14, color: "#ddd", lineHeight: 1.7, marginBottom: 16 }}>
+              <span style={{ color: "#444", marginRight: 8 }}>{idx + 1}.</span>{q.text}
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {LIKERT.map(v => (
+                <button key={v} onClick={() => setAnswer(q.id, v)}
+                  style={{
+                    flex: 1,
+                    background: answers[q.id] === v ? "#fff" : "transparent",
+                    color: answers[q.id] === v ? "#000" : "#888",
+                    border: `1px solid ${answers[q.id] === v ? "#fff" : "#2a2a2a"}`,
+                    borderRadius: 5, padding: "10px 4px",
+                    fontFamily: mono, fontSize: 13, cursor: "pointer",
+                    WebkitTapHighlightColor: "transparent"
+                  }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 28 }}>
+        <button onClick={onCancel} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "14px 24px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Cancel</button>
+        <button onClick={handleSubmit} disabled={!allAnswered || submitting}
+          style={{ flex: 1, background: allAnswered ? "#fff" : "#1a1a1a", color: allAnswered ? "#000" : "#333", border: "none", borderRadius: 5, padding: "14px", fontFamily: mono, fontSize: 14, cursor: allAnswered ? "pointer" : "not-allowed", WebkitTapHighlightColor: "transparent" }}>
+          {submitting ? "Scoring..." : allAnswered ? "See my results →" : `Answer all questions (${questions.length - answeredCount} left)`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// RIASEC results screen — full 6-axis breakdown (not just the
+// code), colored per trait, top-3 explanations, AI synthesis
+// paragraph, and a print-based "Download report" button.
+// ============================================================
+function RiasecResultsPage({ riasecData, onBack, onRetake }) {
+  if (!riasecData) return null;
+  const { scores, ranked, code, synthesis, takenAt } = riasecData;
+  const orderedCats = ranked && ranked.length === 6 ? ranked : Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+
+  return (
+    <div style={{ minHeight: "100vh", padding: "32px 20px 60px", maxWidth: 640, margin: "0 auto" }}>
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: #fff !important; color: #000 !important; }
+        }
+      `}</style>
+      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+        <button onClick={onBack} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>← Back</button>
+        <button onClick={() => window.print()} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 4, padding: "8px 16px", fontFamily: mono, fontSize: 12, color: "#4ade80", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Download report</button>
+      </div>
+
+      <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Your Holland Code</div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 8 }}>
+          {code.split("").map((letter, i) => (
+            <span key={i} style={{ fontFamily: syne, fontSize: 56, fontWeight: 800, color: RIASEC_META[letter].color }}>{letter}</span>
+          ))}
+        </div>
+        <div style={{ fontFamily: mono, fontSize: 12, color: "#555" }}>
+          Taken {new Date(takenAt).toLocaleDateString("en-IN", { month: "long", day: "numeric", year: "numeric" })}
+        </div>
+      </div>
+
+      <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", margin: "28px 0" }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>Full trait breakdown</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {orderedCats.map(cat => (
+            <div key={cat}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                <span style={{ fontFamily: mono, fontSize: 13, color: "#ccc" }}>{RIASEC_META[cat].label}</span>
+                <span style={{ fontFamily: mono, fontSize: 13, color: RIASEC_META[cat].color }}>{scores[cat]}%</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 4, background: "#1a1a1a", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${scores[cat]}%`, background: RIASEC_META[cat].color, transition: "width 0.8s ease" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "22px", marginBottom: 20 }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 16 }}>What your top traits mean</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {orderedCats.slice(0, 3).map(cat => (
+            <div key={cat}>
+              <div style={{ fontFamily: syne, fontSize: 16, fontWeight: 700, color: RIASEC_META[cat].color, marginBottom: 4 }}>{RIASEC_META[cat].label}</div>
+              <div style={{ fontFamily: mono, fontSize: 13, color: "#aaa", lineHeight: 1.7 }}>{RIASEC_META[cat].blurb}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "22px", marginBottom: 28 }}>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>What this means for you</div>
+        <div style={{ fontFamily: mono, fontSize: 14, color: "#ccc", lineHeight: 1.8 }}>{synthesis}</div>
+      </div>
+
+      <button className="no-print" onClick={onRetake} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "12px 24px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer", display: "block", margin: "0 auto", WebkitTapHighlightColor: "transparent" }}>Retake test</button>
+    </div>
+  );
+}
+
+// ============================================================
+// One-time interstitial shown right after onboarding completes
+// (logged-in users only) — mentions the RIASEC test lives in
+// Settings without forcing it into the onboarding flow itself.
+// ============================================================
+function OnboardingDonePage({ onContinue }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center" }}>
+      <div style={{ maxWidth: 480 }}>
+        <div style={{ width: 56, height: 56, border: "1px solid #4ade8060", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
+          <span style={{ color: "#4ade80", fontSize: 24 }}>✓</span>
+        </div>
+        <div style={{ fontFamily: syne, fontSize: 26, fontWeight: 800, color: "#fff", marginBottom: 16, lineHeight: 1.3 }}>
+          Your onboarding is done, and Nirnayam is completely tailored to find Your True North.
+        </div>
+        <div style={{ fontFamily: mono, fontSize: 14, color: "#999", lineHeight: 1.8, marginBottom: 32 }}>
+          You can also take a psychometric test later on.<br />
+          <span style={{ color: "#666", fontSize: 13 }}>P.S. the option is available in Settings.</span>
+        </div>
+        <button onClick={onContinue} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "16px 44px", fontFamily: mono, fontSize: 15, fontWeight: 500, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>
+          Continue to Nirnayam →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, onStreakUpdate, riasecData, onGoToRiasecTest, onGoToRiasecResults, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat'|'horizon-choice', text?, image?, result?, situation? }
   const bottomRef = useRef(null);
@@ -1646,10 +1965,9 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
 
-  // NEW: session-scoped long-term-decision mode. null until the first
-  // long-term question is asked and the user picks a depth; then reused
-  // silently for every subsequent long-term question in this chat.
-  // Resets automatically on refresh since it's plain useState.
+  // Session-scoped long-term-decision mode. null until the first long-term
+  // question is asked and the user picks a depth; then reused silently for
+  // every subsequent long-term question in this chat. Resets on refresh.
   const [longTermMode, setLongTermMode] = useState(null); // null | "quick" | "deep"
   const [pendingLongTerm, setPendingLongTerm] = useState(null); // { situation } while chip is showing
 
@@ -1708,7 +2026,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
     e.target.value = "";
   };
 
-  // NEW: called when the user picks "Quick take" or "Full breakdown" on the
+  // Called when the user picks "Quick take" or "Full breakdown" on the
   // one-time horizon-choice chip. Sets the standing session preference,
   // then resumes the original in-flight decision request.
   const resolveHorizonChoice = async (choice) => {
@@ -1718,7 +2036,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
     setMessages(prev => prev.filter(m => m.kind !== "horizon-choice"));
     setLoading(true);
     try {
-      const res = await callNirnayam(situation, profile, personData, choice === "deep", true);
+      const res = await callNirnayam(situation, profile, personData, riasecData, choice === "deep", true);
       setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation }]);
     } catch (e) {
       setError(e.message || "Something went wrong. Check your connection and try again.");
@@ -1743,7 +2061,6 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
 
     try {
       // Images always go to the study/tutor chat — the decision engine can't read images.
-      // UPDATED: classifyIntent now returns { route, horizon } in one call.
       const { route: intent, horizon } = imageForThisSend
         ? { route: "study", horizon: "short" }
         : await classifyIntent(trimmed);
@@ -1758,7 +2075,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
         }
         const isLong = horizon === "long";
         const useDeepDive = isLong && longTermMode === "deep";
-        const res = await callNirnayam(trimmed, profile, personData, useDeepDive, isLong);
+        const res = await callNirnayam(trimmed, profile, personData, riasecData, useDeepDive, isLong);
         setMessages(prev => [...prev, { role: "assistant", kind: "decision", result: res, situation: trimmed }]);
       }
 
@@ -1813,6 +2130,8 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
 
   if (showSettings) return (
     <SettingsPage profile={profile} user={user} personData={personData} xpData={xpData} streakData={streakData}
+      riasecData={riasecData} onTakeRiasecTest={onGoToRiasecTest} onViewRiasecResults={onGoToRiasecResults}
+      onGoogleSignIn={onGoogleSignIn}
       onEditProfile={() => { setShowSettings(false); setShowEditConfirm(true); }}
       onSignOut={onSignOut} onBack={() => setShowSettings(false)} onGoToLanding={onGoToLanding} />
   );
@@ -1921,7 +2240,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
                   </div>
                 );
               }
-              // NEW: one-time horizon confirmation chip.
+              // One-time horizon confirmation chip.
               if (m.kind === "horizon-choice") {
                 return (
                   <div key={i} style={{ alignSelf: "stretch", background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "18px 20px", animation: "fadeIn 0.3s ease forwards" }}>
@@ -2040,7 +2359,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
   );
 }
 
-function SettingsPage({ profile, user, personData, xpData, streakData, onEditProfile, onSignOut, onBack }) {
+function SettingsPage({ profile, user, personData, xpData, streakData, riasecData, onTakeRiasecTest, onViewRiasecResults, onGoogleSignIn, onEditProfile, onSignOut, onBack }) {
   const displayStreak = streakData ? getDisplayStreak(streakData) : null;
   return (
     <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 540, margin: "0 auto" }}>
@@ -2062,6 +2381,36 @@ function SettingsPage({ profile, user, personData, xpData, streakData, onEditPro
           <div style={{ fontFamily: mono, fontSize: 13, color: "#666" }}>You're using Nirnayam as a guest. Sign in to save your profile and enable personalisation.</div>
         )}
       </div>
+
+      <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
+        <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Psychometric Test</div>
+        {!user ? (
+          <div style={{ fontFamily: mono, fontSize: 13, color: "#666" }}>Sign in to take this test.</div>
+        ) : riasecData ? (
+          <div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 10 }}>
+              {riasecData.code.split("").map((letter, i) => (
+                <span key={i} style={{ fontFamily: syne, fontSize: 28, fontWeight: 800, color: RIASEC_META[letter].color }}>{letter}</span>
+              ))}
+            </div>
+            <div style={{ fontFamily: mono, fontSize: 12, color: "#666", marginBottom: 16 }}>
+              Your Holland Code — taken {new Date(riasecData.takenAt).toLocaleDateString("en-IN", { month: "long", day: "numeric", year: "numeric" })}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={onViewRiasecResults} style={{ flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "10px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>View full results</button>
+              <button onClick={onTakeRiasecTest} style={{ flex: 1, background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "10px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Retake</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontFamily: mono, fontSize: 13, color: "#888", lineHeight: 1.7, marginBottom: 14 }}>
+              Take a 30-question Holland Code test to discover which subjects and career paths genuinely fit how you think — and get advice tailored around it.
+            </div>
+            <button onClick={onTakeRiasecTest} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "10px 20px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Take the test</button>
+          </div>
+        )}
+      </div>
+
       {user && personData && personData.total > 0 && (
         <div style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px", marginBottom: 12 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>Personalisation — {personData.total} ratings</div>
@@ -2221,6 +2570,7 @@ export default function Nirnayam() {
   const [personData, setPersonData] = useState(null);
   const [xpData, setXpData] = useState(null);
   const [streakData, setStreakData] = useState(null);
+  const [riasecData, setRiasecData] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
 
   const refreshPersonData = async (uid) => {
@@ -2238,6 +2588,11 @@ export default function Nirnayam() {
     setStreakData(data);
   };
 
+  const refreshRiasec = async (uid) => {
+    const data = await loadRiasecResult(uid);
+    setRiasecData(data);
+  };
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setAuthLoading(false);
@@ -2248,10 +2603,11 @@ export default function Nirnayam() {
           if (savedProfile) { setProfile(savedProfile); await refreshPersonData(firebaseUser.uid); }
           await refreshXP(firebaseUser.uid);
           await refreshStreak(firebaseUser.uid);
+          await refreshRiasec(firebaseUser.uid);
         } catch (e) { console.error(e); }
         setScreen("landing");
       } else {
-        setUser(null); setProfile(null); setPersonData(null); setXpData(null); setStreakData(null);
+        setUser(null); setProfile(null); setPersonData(null); setXpData(null); setStreakData(null); setRiasecData(null);
         setScreen("landing");
       }
     });
@@ -2264,15 +2620,33 @@ export default function Nirnayam() {
     catch (e) { console.error(e); setAuthLoading(false); }
   };
 
+  // Only show the RIASEC-mention interstitial the FIRST time someone
+  // completes onboarding (profile was null beforehand) and only for
+  // logged-in users — editing an existing profile skips straight to app.
   const handleOnboardingComplete = async (newProfile) => {
+    const isFirstTime = !profile;
     setProfile(newProfile);
     if (user) { try { await saveProfile(user.uid, newProfile); } catch (e) { console.error(e); } }
-    setScreen("app");
+    if (isFirstTime && user) {
+      setScreen("onboarding-done");
+    } else {
+      setScreen("app");
+    }
+  };
+
+  // Scores the test, fetches the one-time AI synthesis paragraph, saves it,
+  // then hands off to the results screen with the complete data in hand.
+  const handleRiasecTestComplete = async (results) => {
+    const synthesis = await getRiasecSynthesis(results.scores, results.code, profile);
+    const fullData = { ...results, synthesis };
+    if (user) { try { await saveRiasecResult(user.uid, fullData); } catch (e) { console.error(e); } }
+    setRiasecData({ ...fullData, takenAt: new Date().toISOString() });
+    setScreen("riasec-results");
   };
 
   const handleSignOut = async () => {
     await signOut(auth);
-    setProfile(null); setPersonData(null); setXpData(null); setStreakData(null); setScreen("landing");
+    setProfile(null); setPersonData(null); setXpData(null); setStreakData(null); setRiasecData(null); setScreen("landing");
   };
 
   return (
@@ -2314,7 +2688,39 @@ export default function Nirnayam() {
           )}
       {screen === "landing" && <LandingPage user={user} profile={profile} onGoogleSignIn={handleGoogleSignIn} onGuestStart={() => setScreen("onboarding")} onContinue={() => { if (profile) setScreen("app"); else setScreen("onboarding"); }} authLoading={authLoading} />}
       {screen === "onboarding" && <OnboardingPage onComplete={handleOnboardingComplete} initialAnswers={profile} user={user} />}
-      {screen === "app" && profile && <MainApp profile={profile} user={user} personData={personData} xpData={xpData} onXPUpdate={setXpData} streakData={streakData} onStreakUpdate={setStreakData} onEditProfile={() => setScreen("onboarding")} onSignOut={handleSignOut} onGoogleSignIn={handleGoogleSignIn} onGoToLanding={() => setScreen("landing")} onPersonDataRefresh={() => user && refreshPersonData(user.uid)} />}
+      {screen === "onboarding-done" && <OnboardingDonePage onContinue={() => setScreen("app")} />}
+      {screen === "riasec-test" && (
+        <RiasecTestPage
+          onComplete={handleRiasecTestComplete}
+          onCancel={() => setScreen("app")}
+        />
+      )}
+      {screen === "riasec-results" && (
+        <RiasecResultsPage
+          riasecData={riasecData}
+          onBack={() => setScreen("app")}
+          onRetake={() => setScreen("riasec-test")}
+        />
+      )}
+      {screen === "app" && profile && (
+        <MainApp
+          profile={profile}
+          user={user}
+          personData={personData}
+          xpData={xpData}
+          onXPUpdate={setXpData}
+          streakData={streakData}
+          onStreakUpdate={setStreakData}
+          riasecData={riasecData}
+          onGoToRiasecTest={() => setScreen("riasec-test")}
+          onGoToRiasecResults={() => setScreen("riasec-results")}
+          onEditProfile={() => setScreen("onboarding")}
+          onSignOut={handleSignOut}
+          onGoogleSignIn={handleGoogleSignIn}
+          onGoToLanding={() => setScreen("landing")}
+          onPersonDataRefresh={() => user && refreshPersonData(user.uid)}
+        />
+      )}
     </div>
   );
 }
