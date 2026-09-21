@@ -128,6 +128,16 @@ const RIASEC_META = {
   C: { label: "Conventional", color: "#94a3b8", blurb: "You value structure, order, and precision. Clear systems, checklists, and reliable methods feel comfortable to you, and you catch details others miss." },
 };
 
+// Red → gray → green gradient for the 5-point agree/disagree scale.
+const RIASEC_LIKERT = [
+  { v: 1, color: "#ef4444" },
+  { v: 2, color: "#b3716b" },
+  { v: 3, color: "#6b7280" },
+  { v: 4, color: "#7dab7f" },
+  { v: 5, color: "#22c55e" },
+];
+const RIASEC_QUESTIONS_PER_PAGE = 5;
+
 const shuffleArray = (arr) => {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
