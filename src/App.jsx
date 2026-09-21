@@ -131,9 +131,9 @@ const RIASEC_META = {
 // Red → gray → green gradient for the 5-point agree/disagree scale.
 const RIASEC_LIKERT = [
   { v: 1, color: "#ef4444" },
-  { v: 2, color: "#b3716b" },
+  { v: 2, color: "#ad5b62" },
   { v: 3, color: "#6b7280" },
-  { v: 4, color: "#7dab7f" },
+  { v: 4, color: "#479c6f" },
   { v: 5, color: "#22c55e" },
 ];
 const RIASEC_QUESTIONS_PER_PAGE = 5;
@@ -1850,25 +1850,33 @@ function RiasecTestPage({ onComplete, onCancel }) {
             <div style={{ fontFamily: mono, fontSize: 14, color: "#ddd", lineHeight: 1.7, marginBottom: 18 }}>
               <span style={{ color: "#444", marginRight: 8 }}>{page * RIASEC_QUESTIONS_PER_PAGE + idx + 1}.</span>{q.text}
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              {RIASEC_LIKERT.map(l => {
-                const selected = answers[q.id] === l.v;
-                return (
-                  <button key={l.v} onClick={() => setAnswer(q.id, l.v)}
-                    style={{
-                      width: 40, height: 40, borderRadius: "50%",
-                      background: l.color,
-                      border: selected ? "3px solid #fff" : "3px solid transparent",
-                      opacity: selected ? 1 : 0.55,
-                      cursor: "pointer",
-                      transform: selected ? "scale(1.1)" : "scale(1)",
-                      transition: "all 0.15s ease",
-                      WebkitTapHighlightColor: "transparent",
-                      flexShrink: 0,
-                    }}
-                  />
-                );
-              })}
+            <div style={{ position: "relative", padding: "8px 8px 4px" }}>
+              <div style={{
+                position: "absolute", top: "50%", left: 18, right: 18, height: 2,
+                background: "linear-gradient(90deg, #ef4444, #6b7280, #22c55e)",
+                transform: "translateY(-50%)", zIndex: 0,
+              }} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
+                {RIASEC_LIKERT.map(l => {
+                  const selected = answers[q.id] === l.v;
+                  return (
+                    <button key={l.v} onClick={() => setAnswer(q.id, l.v)}
+                      style={{
+                        width: selected ? 36 : 22,
+                        height: selected ? 36 : 22,
+                        borderRadius: "50%",
+                        background: l.color,
+                        border: "2px solid #0d0d0d",
+                        boxShadow: selected ? `0 0 14px ${l.color}` : "none",
+                        cursor: "pointer",
+                        transition: "all 0.18s ease",
+                        WebkitTapHighlightColor: "transparent",
+                        flexShrink: 0,
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
             {idx === 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
