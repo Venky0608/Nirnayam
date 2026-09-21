@@ -190,7 +190,7 @@ const buildRiasecContext = (riasecData, explicit) => {
   return `\n\nRIASEC PROFILE (Holland Code: ${code} — use ONLY to silently shape which suggestions and tone fit this student; strongest traits: ${topLabels.join(", ")}. NEVER name a trait, a code letter, or mention this test in your response — it must read as ordinary personalized advice, not a callback to a test result.)`;
 };
 
-const buildRiasecSynthesisPrompt = (scores, code, profile) => `You are Nirnayam, helping a student interpret their Holland Code (RIASEC) psychometric test results.
+const buildRiasecSynthesisPrompt = (scores, code, profile) => `You are Nirnayam, helping a student interpret their RIASEC psychometric test results.
 
 STUDENT PROFILE:
 - Grade: ${profile.grade}${profile.stream ? ` (${profile.stream})` : ""}
@@ -199,14 +199,17 @@ STUDENT PROFILE:
 
 RIASEC RESULTS (percentage of max per category, out of 100):
 ${Object.entries(scores).map(([cat, pct]) => `${RIASEC_META[cat].label}: ${pct}%`).join("\n")}
-Holland Code: ${code}
+RIASEC Code: ${code}
 
-Write a short, specific paragraph (4-6 sentences) that:
-1. Names what their top traits actually mean in practice for a student their age.
-2. Explicitly connects it to THEIR stated stream/academic goal — say plainly whether their current path aligns with, complements, or sits in tension with their trait profile, using specifics from their profile, not a generic statement.
-3. Avoids generic horoscope-style language ("you're a natural leader!") — ground every claim in the actual scores and profile given.
+Write 4-6 short bullet points (each one sentence, two only if truly needed) that together:
+1. Name what their top traits actually mean in practice for a student their age.
+2. Explicitly connect it to THEIR stated stream/academic goal — say plainly whether their current path aligns with, complements, or sits in tension with their trait profile, using specifics from their profile, not a generic statement.
+3. End with one concrete, actionable suggestion tied to their profile.
 
-Do not use markdown formatting. Return plain text only, no preamble like "Here's your synthesis" — just the paragraph itself.`;
+Avoid generic horoscope-style language ("you're a natural leader!") — ground every claim in the actual scores and profile given. Each bullet should stand alone and be easy to scan.
+
+Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown, no backticks. Just the raw JSON:
+{"bullets":["point 1","point 2","point 3","point 4"]}`;
 
 const buildSystemPrompt = (profile, personData, riasecData) => `You are Nirnayam — a sharp, practical decision advisor for students grades 9-12. Your job is to break decision paralysis fast with clear, reasoned recommendations.
 
@@ -367,6 +370,7 @@ const CHAT_KEY = import.meta.env.VITE_GEMINI_CHAT_KEY;
 // paragraph shown on the RIASEC results page. Costs a fraction of a cent —
 // small prompt, short capped output.
 const getRiasecSynthesis = async (scores, code, profile) => {
+  const fallback = ["Your results are ready — take a look at your trait breakdown below."];
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${CHAT_KEY}`,
@@ -374,17 +378,21 @@ const getRiasecSynthesis = async (scores, code, profile) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          generationConfig: { temperature: 0.5, maxOutputTokens: 400 },
+          generationConfig: { temperature: 0.5, maxOutputTokens: 400, responseMimeType: "application/json" },
           contents: [{ role: "user", parts: [{ text: buildRiasecSynthesisPrompt(scores, code, profile) }] }]
         })
       }
     );
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    return text || "Your results are ready — take a look at your trait breakdown below.";
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    const cleaned = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+    const parsed = JSON.parse(match[0]);
+    return Array.isArray(parsed.bullets) && parsed.bullets.length > 0 ? parsed.bullets : fallback;
   } catch (err) {
     console.error("RIASEC synthesis error:", err);
-    return "Your results are ready — take a look at your trait breakdown below.";
+    return fallback;
   }
 };
 
@@ -1798,64 +1806,86 @@ function PlannerPage({ user, xp, streak, onXPChange, onStreakChange, onBack, onG
 function RiasecTestPage({ onComplete, onCancel }) {
   const [questions] = useState(() => shuffleArray(RIASEC_QUESTIONS));
   const [answers, setAnswers] = useState({});
+  const [page, setPage] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
-  const answeredCount = Object.keys(answers).length;
-  const allAnswered = answeredCount === questions.length;
+  const totalPages = Math.ceil(questions.length / RIASEC_QUESTIONS_PER_PAGE);
+  const pageQuestions = questions.slice(page * RIASEC_QUESTIONS_PER_PAGE, page * RIASEC_QUESTIONS_PER_PAGE + RIASEC_QUESTIONS_PER_PAGE);
+  const pageAnswered = pageQuestions.every(q => answers[q.id] !== undefined);
+  const isLastPage = page === totalPages - 1;
 
   const setAnswer = (id, val) => setAnswers(a => ({ ...a, [id]: val }));
 
-  const LIKERT = [1, 2, 3, 4, 5];
+  const handleBack = () => {
+    if (page === 0) { onCancel(); return; }
+    setPage(p => p - 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  const handleSubmit = async () => {
-    if (!allAnswered || submitting) return;
+  const handleNext = async () => {
+    if (!pageAnswered || submitting) return;
+    if (!isLastPage) {
+      setPage(p => p + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     setSubmitting(true);
     const results = computeRiasecResults(questions, answers);
     await onComplete(results);
   };
 
   return (
-    <div style={{ minHeight: "100vh", padding: "32px 20px 80px", maxWidth: 640, margin: "0 auto" }}>
-      <div style={{ fontFamily: syne, fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Holland Code Test</div>
-      <div style={{ fontFamily: mono, fontSize: 13, color: "#666", marginBottom: 6, lineHeight: 1.7 }}>
+    <div style={{ minHeight: "100vh", padding: "32px 20px 60px", maxWidth: 640, margin: "0 auto" }}>
+      <div style={{ fontFamily: syne, fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 6 }}>RIASEC Test</div>
+      <div style={{ fontFamily: mono, fontSize: 13, color: "#666", marginBottom: 20, lineHeight: 1.7 }}>
         Answer honestly — there's no right answer, just what's true for you.
       </div>
-      <div style={{ fontFamily: mono, fontSize: 11, color: "#555", marginBottom: 20 }}>
-        1 = Strongly disagree &nbsp;·&nbsp; 3 = Neutral &nbsp;·&nbsp; 5 = Strongly agree
+      <div style={{ fontFamily: mono, fontSize: 12, color: "#4ade80", marginBottom: 24 }}>
+        Page {page + 1} of {totalPages}
       </div>
-      <div style={{ fontFamily: mono, fontSize: 12, color: "#4ade80", marginBottom: 24, position: "sticky", top: 0, background: "#080808", padding: "10px 0", zIndex: 5, borderBottom: "1px solid #1a1a1a" }}>
-        {answeredCount} / {questions.length} answered
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {questions.map((q, idx) => (
-          <div key={q.id} style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "18px 20px" }}>
-            <div style={{ fontFamily: mono, fontSize: 14, color: "#ddd", lineHeight: 1.7, marginBottom: 16 }}>
-              <span style={{ color: "#444", marginRight: 8 }}>{idx + 1}.</span>{q.text}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {pageQuestions.map((q, idx) => (
+          <div key={q.id} style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 8, padding: "20px 20px 16px" }}>
+            <div style={{ fontFamily: mono, fontSize: 14, color: "#ddd", lineHeight: 1.7, marginBottom: 18 }}>
+              <span style={{ color: "#444", marginRight: 8 }}>{page * RIASEC_QUESTIONS_PER_PAGE + idx + 1}.</span>{q.text}
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {LIKERT.map(v => (
-                <button key={v} onClick={() => setAnswer(q.id, v)}
-                  style={{
-                    flex: 1,
-                    background: answers[q.id] === v ? "#fff" : "transparent",
-                    color: answers[q.id] === v ? "#000" : "#888",
-                    border: `1px solid ${answers[q.id] === v ? "#fff" : "#2a2a2a"}`,
-                    borderRadius: 5, padding: "10px 4px",
-                    fontFamily: mono, fontSize: 13, cursor: "pointer",
-                    WebkitTapHighlightColor: "transparent"
-                  }}>
-                  {v}
-                </button>
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              {RIASEC_LIKERT.map(l => {
+                const selected = answers[q.id] === l.v;
+                return (
+                  <button key={l.v} onClick={() => setAnswer(q.id, l.v)}
+                    style={{
+                      width: 40, height: 40, borderRadius: "50%",
+                      background: l.color,
+                      border: selected ? "3px solid #fff" : "3px solid transparent",
+                      opacity: selected ? 1 : 0.55,
+                      cursor: "pointer",
+                      transform: selected ? "scale(1.1)" : "scale(1)",
+                      transition: "all 0.15s ease",
+                      WebkitTapHighlightColor: "transparent",
+                      flexShrink: 0,
+                    }}
+                  />
+                );
+              })}
             </div>
+            {idx === 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+                <span style={{ fontFamily: mono, fontSize: 9, color: "#777", whiteSpace: "nowrap" }}>Completely Disagree</span>
+                <span style={{ fontFamily: mono, fontSize: 9, color: "#777", whiteSpace: "nowrap" }}>Neutral</span>
+                <span style={{ fontFamily: mono, fontSize: 9, color: "#777", whiteSpace: "nowrap" }}>Completely Agree</span>
+              </div>
+            )}
           </div>
         ))}
       </div>
+
       <div style={{ display: "flex", gap: 10, marginTop: 28 }}>
-        <button onClick={onCancel} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "14px 24px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Cancel</button>
-        <button onClick={handleSubmit} disabled={!allAnswered || submitting}
-          style={{ flex: 1, background: allAnswered ? "#fff" : "#1a1a1a", color: allAnswered ? "#000" : "#333", border: "none", borderRadius: 5, padding: "14px", fontFamily: mono, fontSize: 14, cursor: allAnswered ? "pointer" : "not-allowed", WebkitTapHighlightColor: "transparent" }}>
-          {submitting ? "Scoring..." : allAnswered ? "See my results →" : `Answer all questions (${questions.length - answeredCount} left)`}
+        <button onClick={handleBack} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "14px 24px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>← Back</button>
+        <button onClick={handleNext} disabled={!pageAnswered || submitting}
+          style={{ flex: 1, background: pageAnswered ? "#fff" : "#1a1a1a", color: pageAnswered ? "#000" : "#333", border: "none", borderRadius: 5, padding: "14px", fontFamily: mono, fontSize: 14, cursor: pageAnswered ? "pointer" : "not-allowed", WebkitTapHighlightColor: "transparent" }}>
+          {submitting ? "Scoring..." : isLastPage ? "See my results →" : "Next →"}
         </button>
       </div>
     </div>
@@ -1868,9 +1898,20 @@ function RiasecTestPage({ onComplete, onCancel }) {
 // paragraph, and a print-based "Download report" button.
 // ============================================================
 function RiasecResultsPage({ riasecData, onBack, onRetake }) {
+  // Browser's "Save as PDF" dialog defaults its filename to document.title —
+  // this makes the downloaded report file named after the actual code
+  // instead of the generic app title. Reverts on unmount.
+  useEffect(() => {
+    if (!riasecData) return;
+    const prevTitle = document.title;
+    document.title = `${riasecData.code} - Nirnayam`;
+    return () => { document.title = prevTitle; };
+  }, [riasecData]);
+
   if (!riasecData) return null;
-  const { scores, ranked, code, synthesis, takenAt } = riasecData;
+  const { scores, ranked, code, synthesisBullets, takenAt } = riasecData;
   const orderedCats = ranked && ranked.length === 6 ? ranked : Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+  const bullets = synthesisBullets && synthesisBullets.length > 0 ? synthesisBullets : ["Your results are ready — take a look at your trait breakdown below."];
 
   return (
     <div style={{ minHeight: "100vh", padding: "32px 20px 60px", maxWidth: 640, margin: "0 auto" }}>
@@ -1886,7 +1927,7 @@ function RiasecResultsPage({ riasecData, onBack, onRetake }) {
       </div>
 
       <div style={{ textAlign: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: mono, fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Your Holland Code</div>
+        <div style={{ fontFamily: mono, fontSize: 11, color: "#555", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>Your RIASEC Code</div>
         <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 8 }}>
           {code.split("").map((letter, i) => (
             <span key={i} style={{ fontFamily: syne, fontSize: 56, fontWeight: 800, color: RIASEC_META[letter].color }}>{letter}</span>
@@ -1928,10 +1969,17 @@ function RiasecResultsPage({ riasecData, onBack, onRetake }) {
 
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8, padding: "22px", marginBottom: 28 }}>
         <div style={{ fontFamily: mono, fontSize: 11, color: "#444", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 14 }}>What this means for you</div>
-        <div style={{ fontFamily: mono, fontSize: 14, color: "#ccc", lineHeight: 1.8 }}>{synthesis}</div>
+        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+          {bullets.map((b, i) => (
+            <li key={i} style={{ fontFamily: mono, fontSize: 13, color: "#ccc", lineHeight: 1.7 }}>{b}</li>
+          ))}
+        </ul>
       </div>
 
-      <button className="no-print" onClick={onRetake} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "12px 24px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer", display: "block", margin: "0 auto", WebkitTapHighlightColor: "transparent" }}>Retake test</button>
+      <div className="no-print" style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+        <button onClick={onRetake} style={{ background: "transparent", border: "1px solid #2a2a2a", borderRadius: 5, padding: "12px 24px", fontFamily: mono, fontSize: 13, color: "#888", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Retake test</button>
+        <button onClick={onBack} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "12px 24px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>← Back to Nirnayam</button>
+      </div>
     </div>
   );
 }
@@ -2404,7 +2452,7 @@ function SettingsPage({ profile, user, personData, xpData, streakData, riasecDat
               ))}
             </div>
             <div style={{ fontFamily: mono, fontSize: 12, color: "#666", marginBottom: 16 }}>
-              Your Holland Code — taken {new Date(riasecData.takenAt).toLocaleDateString("en-IN", { month: "long", day: "numeric", year: "numeric" })}
+              Your RIASEC Code — taken {new Date(riasecData.takenAt).toLocaleDateString("en-IN", { month: "long", day: "numeric", year: "numeric" })}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={onViewRiasecResults} style={{ flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "10px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>View full results</button>
@@ -2414,7 +2462,7 @@ function SettingsPage({ profile, user, personData, xpData, streakData, riasecDat
         ) : (
           <div>
             <div style={{ fontFamily: mono, fontSize: 13, color: "#888", lineHeight: 1.7, marginBottom: 14 }}>
-              Take a 30-question Holland Code test to discover which subjects and career paths genuinely fit how you think — and get advice tailored around it.
+              Take a 30-question RIASEC test to discover which subjects and career paths genuinely fit how you think — and get advice tailored around it.
             </div>
             <button onClick={onTakeRiasecTest} style={{ background: "#fff", color: "#000", border: "none", borderRadius: 5, padding: "10px 20px", fontFamily: mono, fontSize: 13, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Take the test</button>
           </div>
@@ -2647,8 +2695,8 @@ export default function Nirnayam() {
   // Scores the test, fetches the one-time AI synthesis paragraph, saves it,
   // then hands off to the results screen with the complete data in hand.
   const handleRiasecTestComplete = async (results) => {
-    const synthesis = await getRiasecSynthesis(results.scores, results.code, profile);
-    const fullData = { ...results, synthesis };
+    const synthesisBullets = await getRiasecSynthesis(results.scores, results.code, profile);
+    const fullData = { ...results, synthesisBullets };
     if (user) { try { await saveRiasecResult(user.uid, fullData); } catch (e) { console.error(e); } }
     setRiasecData({ ...fullData, takenAt: new Date().toISOString() });
     setScreen("riasec-results");
