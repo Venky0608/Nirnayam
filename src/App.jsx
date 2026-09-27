@@ -2285,7 +2285,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
     marginBottom: 24
   }}
           >
-            {user && chatSessions.length > 1 && (
+            {user && chatSessions.length > 0 && (
               <select
                 value={viewingSessionId || ""}
                 onChange={(e) => {
