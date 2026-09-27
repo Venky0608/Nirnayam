@@ -86,7 +86,7 @@ const loadChatSessions = async (uid) => {
     const q = query(collection(db, "users", uid, "chatSessions"), orderBy("date", "desc"), limit(30));
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data());
-  } catch { return []; }
+  } catch (e) { console.error("loadChatSessions failed:", e); return []; }
 };
 
 const hydrateImage = (m) => m.image ? { ...m, image: { ...m.image, dataUrl: `data:${m.image.mimeType};base64,${m.image.data}` } } : m;
