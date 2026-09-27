@@ -2048,6 +2048,69 @@ function OnboardingDonePage({ onContinue }) {
   );
 }
 
+function ChatHistoryPage({ sessions, today, onSelectSession, onBack }) {
+  const getPreview = (messages) => {
+    const firstUserMsg = messages?.find(m => m.role === "user" && m.text);
+    return firstUserMsg ? firstUserMsg.text.slice(0, 80) : "No messages";
+  };
+
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr + "T00:00:00");
+    const isToday = dateStr === today;
+    return isToday ? "Today" : d.toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric" });
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", padding: "32px 20px", maxWidth: 640, margin: "0 auto" }}>
+      <div style={{ fontFamily: syne, fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Chat History</div>
+      <div style={{ fontFamily: mono, fontSize: 12, color: "#555", marginBottom: 28 }}>
+        {sessions.length} day{sessions.length !== 1 ? "s" : ""} of conversations
+      </div>
+
+      {sessions.length === 0 ? (
+        <div style={{ fontFamily: mono, fontSize: 13, color: "#444", textAlign: "center", padding: "40px 0" }}>
+          No conversations yet.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
+          {sessions.map(s => (
+            <button
+              key={s.date}
+              onClick={() => onSelectSession(s.date)}
+              style={{
+                background: "#0d0d0d",
+                border: "1px solid #1e1e1e",
+                borderRadius: 8,
+                padding: "16px 18px",
+                textAlign: "left",
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontFamily: syne, fontSize: 15, fontWeight: 700, color: s.date === today ? "#4ade80" : "#fff" }}>
+                  {formatDate(s.date)}
+                </span>
+                <span style={{ fontFamily: mono, fontSize: 11, color: "#444" }}>
+                  {s.messages?.length || 0} message{s.messages?.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div style={{ fontFamily: mono, fontSize: 13, color: "#888", lineHeight: 1.5 }}>
+                {getPreview(s.messages)}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button onClick={onBack} style={{ background: "transparent", border: "1px solid #1e1e1e", borderRadius: 4, padding: "10px 20px", fontFamily: mono, fontSize: 13, color: "#666", cursor: "pointer", WebkitTapHighlightColor: "transparent", display: "block", margin: "0 auto" }}>← Back</button>
+    </div>
+  );
+}
+
 function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, onStreakUpdate, riasecData, onGoToRiasecTest, onGoToRiasecResults, onEditProfile, onSignOut, onGoogleSignIn, onGoToLanding, onPersonDataRefresh }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]); // { role: 'user'|'assistant', kind: 'decision'|'chat'|'horizon-choice', text?, image?, result?, situation? }
@@ -2056,6 +2119,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
   const [error, setError] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showPlanner, setShowPlanner] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const textareaRef = useRef(null);
@@ -2256,6 +2320,26 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
     <PlannerPage user={user} xp={xp} streak={streak} onXPChange={onXPUpdate} onStreakChange={onStreakUpdate} onGoogleSignIn={onGoogleSignIn} onBack={() => setShowPlanner(false)} />
   );
 
+    if (showHistory) return (
+    <ChatHistoryPage
+      sessions={chatSessions}
+      today={today}
+      onBack={() => setShowHistory(false)}
+      onSelectSession={(date) => {
+        if (date === today) {
+          setViewingSessionId(null);
+          const liveSession = chatSessions.find(s => s.date === today);
+          setMessages(liveSession ? liveSession.messages.map(hydrateImage) : []);
+        } else {
+          setViewingSessionId(date);
+          const session = chatSessions.find(s => s.date === date);
+          setMessages(session ? session.messages.map(hydrateImage) : []);
+        }
+        setShowHistory(false);
+      }}
+    />
+  );
+
 
   return (
     <div style={{ minHeight: "100vh", padding: "20px 16px", maxWidth: 950, margin: "0 auto" }}>
@@ -2297,28 +2381,26 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
     marginBottom: 24
   }}
           >
-            {user && (
-              <select
-                value={viewingSessionId || ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    setViewingSessionId(null);
-                    const liveSession = chatSessions.find(s => s.date === today);
-                    setMessages(liveSession ? liveSession.messages.map(hydrateImage) : []);
-                  } else {
-                    setViewingSessionId(val);
-                    const session = chatSessions.find(s => s.date === val);
-                    setMessages(session ? session.messages.map(hydrateImage) : []);
-                  }
+                        {user && (
+              <button
+                onClick={() => setShowHistory(true)}
+                style={{
+                  background: "transparent",
+                  border: "1px solid #1e1e1e",
+                  borderRadius: 4,
+                  padding: "8px 14px",
+                  fontFamily: mono,
+                  fontSize: 12,
+                  color: viewingSessionId !== null ? "#4ade80" : "#666",
+                  cursor: "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5
                 }}
-                style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 4, padding: "6px 10px", fontFamily: mono, fontSize: 12, color: "#666" }}
               >
-                <option value="">Today</option>
-                {chatSessions.filter(s => s.date !== today).map(s => (
-                  <option key={s.date} value={s.date}>{s.date}</option>
-                ))}
-              </select>
+                History{viewingSessionId !== null ? " •" : ""}
+              </button>
             )}
             <button
               onClick={() => setShowPlanner(true)}
