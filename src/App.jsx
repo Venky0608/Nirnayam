@@ -70,15 +70,20 @@ const loadPersonalisationStats = async (uid) => {
 // ---------- Chat history (one Firestore doc per calendar day) ----------
 const saveChatSession = async (uid, dateStr, messages) => {
   try {
-    const slim = messages.map(m =>
-      m.image ? { ...m, image: { mimeType: m.image.mimeType, data: m.image.data } } : m
-    );
+    const slim = messages.map(m => {
+      const clean = { role: m.role, text: m.text || "" };
+      if (m.kind) clean.kind = m.kind;
+      if (m.result) clean.result = m.result;
+      if (m.situation) clean.situation = m.situation;
+      if (m.image) clean.image = { mimeType: m.image.mimeType, data: m.image.data };
+      return clean;
+    });
     await setDoc(doc(db, "users", uid, "chatSessions", dateStr), {
       date: dateStr,
       messages: slim,
       updatedAt: new Date().toISOString(),
     }, { merge: true });
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error("saveChatSession failed:", e); }
 };
 
 const loadChatSessions = async (uid) => {
@@ -2087,11 +2092,13 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
       block: "end",
     });
   }, [messages, loading]);
-        useEffect(() => {
+              useEffect(() => {
     if (!user) return;
     loadChatSessions(user.uid).then((sessions) => {
+      console.log("Loaded sessions:", sessions);
       setChatSessions(sessions);
       const liveSession = sessions.find(s => s.date === today);
+      console.log("Today's date:", today, "Found live session:", liveSession);
       if (liveSession) {
         setMessages(liveSession.messages.map(hydrateImage));
       }
