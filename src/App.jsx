@@ -67,6 +67,30 @@ const loadPersonalisationStats = async (uid) => {
   } catch { return null; }
 };
 
+// ---------- Chat history (one Firestore doc per calendar day) ----------
+const saveChatSession = async (uid, dateStr, messages) => {
+  try {
+    const slim = messages.map(m =>
+      m.image ? { ...m, image: { mimeType: m.image.mimeType, data: m.image.data } } : m
+    );
+    await setDoc(doc(db, "users", uid, "chatSessions", dateStr), {
+      date: dateStr,
+      messages: slim,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (e) { console.error(e); }
+};
+
+const loadChatSessions = async (uid) => {
+  try {
+    const q = query(collection(db, "users", uid, "chatSessions"), orderBy("date", "desc"), limit(30));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data());
+  } catch { return []; }
+};
+
+const hydrateImage = (m) => m.image ? { ...m, image: { ...m.image, dataUrl: `data:${m.image.mimeType};base64,${m.image.data}` } } : m;
+
 const buildPersonalisationContext = (personData) => {
   if (!personData || personData.total === 0) return "";
   const lines = Object.entries(personData.stats).map(([cat, data]) => {
@@ -2037,10 +2061,15 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
   const [longTermMode, setLongTermMode] = useState(null); // null | "quick" | "deep"
   const [pendingLongTerm, setPendingLongTerm] = useState(null); // { situation } while chip is showing
 
-  // Staged image: attached (via paste or file picker) but not yet sent.
+    // Staged image: attached (via paste or file picker) but not yet sent.
   const [stagedImage, setStagedImage] = useState(null); // { mimeType, data, dataUrl }
   const [attachError, setAttachError] = useState(null);
   const imageInputRef = useRef(null);
+
+  // Chat history — one Firestore doc per day, browsable read-only.
+  const [chatSessions, setChatSessions] = useState([]);
+  const [viewingSessionId, setViewingSessionId] = useState(null); // null = live/today
+  const today = getLocalDateStr();
 
   const xp = xpData || { cycleXP: 0, level: 1, rebirths: 0, lifetimeXP: 0 };
   const streak = streakData || { count: 0, lastActiveDate: null, longest: 0 };
@@ -2058,6 +2087,15 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
       block: "end",
     });
   }, [messages, loading]);
+    useEffect(() => {
+    if (!user) return;
+    loadChatSessions(user.uid).then(setChatSessions);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || viewingSessionId !== null || messages.length === 0) return;
+    saveChatSession(user.uid, today, messages);
+  }, [messages, user, viewingSessionId]);
 
   const handlePaste = async (e) => {
     const items = e.clipboardData?.items;
@@ -2239,7 +2277,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
             )}
           </div>
         </div>
-        <div
+                <div
     style={{
     display: "flex",
     justifyContent: "flex-end",
@@ -2247,6 +2285,29 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
     marginBottom: 24
   }}
           >
+            {user && chatSessions.length > 1 && (
+              <select
+                value={viewingSessionId || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!val) {
+                    setViewingSessionId(null);
+                    const liveSession = chatSessions.find(s => s.date === today);
+                    setMessages(liveSession ? liveSession.messages.map(hydrateImage) : []);
+                  } else {
+                    setViewingSessionId(val);
+                    const session = chatSessions.find(s => s.date === val);
+                    setMessages(session ? session.messages.map(hydrateImage) : []);
+                  }
+                }}
+                style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 4, padding: "6px 10px", fontFamily: mono, fontSize: 12, color: "#666" }}
+              >
+                <option value="">Today</option>
+                {chatSessions.filter(s => s.date !== today).map(s => (
+                  <option key={s.date} value={s.date}>{s.date}</option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => setShowPlanner(true)}
               style={{
@@ -2386,9 +2447,10 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
                 <button onClick={() => setStagedImage(null)} style={{ background: "transparent", border: "none", color: "#f87171", fontFamily: mono, fontSize: 16, cursor: "pointer" }}>✕</button>
               </div>
             )}
-            <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onPaste={handlePaste} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) {e.preventDefault();if (!loading && (input.trim() || stagedImage)) {handleSend();}}}}
-              placeholder={"Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'\n\n"}
-              style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 100, outline: "none", boxSizing: "border-box" }} />
+                        <textarea ref={textareaRef} value={input} onChange={e => setInput(e.target.value)} onPaste={handlePaste} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) {e.preventDefault();if (!loading && (input.trim() || stagedImage)) {handleSend();}}}}
+              disabled={viewingSessionId !== null}
+              placeholder={viewingSessionId !== null ? "Viewing a past day — switch to Today to keep chatting." : "Ask anything — a decision you're stuck on, or something you want explained.\n\ne.g. 'Should I study physics or finish my chem hw' or 'explain projectile motion'\n\n"}
+              style={{ width: "100%", background: "transparent", border: "none", color: "#ddd", fontFamily: mono, fontSize: 14, lineHeight: 1.8, padding: "16px", resize: "none", minHeight: 100, outline: "none", boxSizing: "border-box", opacity: viewingSessionId !== null ? 0.5 : 1 }} />
             <div style={{ borderTop: "1px solid #111", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <VoiceInputButton onTranscript={(t) => setInput(prev => prev ? prev + " " + t : t)} onError={(e) => setVoiceError(e)} />
@@ -2410,7 +2472,7 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
                   <span>attach</span>
                 </button>
               </div>
-              <button onClick={handleSend} disabled={loading || (!input.trim() && !stagedImage)} style={{ background: loading || (!input.trim() && !stagedImage) ? "#1a1a1a" : "#fff", color: loading || (!input.trim() && !stagedImage) ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || (!input.trim() && !stagedImage) ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
+                            <button onClick={handleSend} disabled={loading || viewingSessionId !== null || (!input.trim() && !stagedImage)} style={{ background: loading || viewingSessionId !== null || (!input.trim() && !stagedImage) ? "#1a1a1a" : "#fff", color: loading || viewingSessionId !== null || (!input.trim() && !stagedImage) ? "#333" : "#000", border: "none", borderRadius: 5, padding: "11px 24px", fontFamily: mono, fontSize: 14, cursor: loading || viewingSessionId !== null || (!input.trim() && !stagedImage) ? "not-allowed" : "pointer", transition: "all 0.2s", WebkitTapHighlightColor: "transparent" }}>
                 {loading ? "thinking..." : "send →"}
               </button>
             </div>
