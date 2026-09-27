@@ -2087,11 +2087,16 @@ function MainApp({ profile, user, personData, xpData, onXPUpdate, streakData, on
       block: "end",
     });
   }, [messages, loading]);
-    useEffect(() => {
+        useEffect(() => {
     if (!user) return;
-    loadChatSessions(user.uid).then(setChatSessions);
+    loadChatSessions(user.uid).then((sessions) => {
+      setChatSessions(sessions);
+      const liveSession = sessions.find(s => s.date === today);
+      if (liveSession) {
+        setMessages(liveSession.messages.map(hydrateImage));
+      }
+    });
   }, [user]);
-
   useEffect(() => {
     if (!user || viewingSessionId !== null || messages.length === 0) return;
     saveChatSession(user.uid, today, messages);
